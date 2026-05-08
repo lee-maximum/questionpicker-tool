@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>多语言闲聊提问器 · 话题库版（完整功能）</title>
+    <style>
+        :root {
+            --sea-deep: #003366;
+            --sea-bright: #0077BE;
+            --sea-shallow: #48CAE4;
+            --sea-grey: #4A5D6E;
+            --sea-bg: #F0F4F8;
+            --card: #FFFFFF;
+            --accent-light: #E0F2F7;
+        }
+        * {
+            box-sizing: border-box;
+        }
+        body, html {
+            margin: 0; padding: 0; height: 100%; width: 100%;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+            background-color: var(--sea-bg);
+            overflow: hidden;
+        }
+
+        /* 语言选择首页 */
+        .lang-home {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #001233, #003366, #0077BE);
+            z-index: 2000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: opacity 0.6s ease;
+        }
+        .lang-card {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 35px 25px;
+            border-radius: 40px;
+            width: 85%;
+            max-width: 380px;
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+        }
+        .lang-card h1 {
+            margin: 0 0 8px 0;
+            font-size: 26px;
+            color: var(--sea-deep);
+        }
+        .lang-card p {
+            margin-bottom: 28px;
+            color: #4A5D6E;
+            font-weight: 500;
+        }
+        .lang-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+        .lang-btn {
+            background: white;
+            border: 2px solid var(--sea-bright);
+            border-radius: 60px;
+            padding: 14px 0;
+            font-size: 18px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: var(--sea-deep);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+        .lang-btn:active { transform: scale(0.96); background: var(--accent-light); }
+        .lang-btn span { font-size: 24px; }
+
+        /* 主容器 */
+        #app-wrapper {
+            height: 100vh;
+            width: 100vw;
+            position: relative;
+            background-color: var(--sea-bg);
+            display: block;
+        }
+        .lang-app {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            transition: transform 0.4s ease-in-out, opacity 0.3s;
+            overflow-y: auto;
+            overflow-x: hidden;
+            background-color: var(--sea-bg);
+        }
+        .lang-app-hidden { transform: translateX(100%); opacity: 0; pointer-events: none; }
+        .lang-app-visible { transform: translateX(0); opacity: 1; pointer-events: auto; }
+
+        /* 页面显隐核心样式（必须） */
+        .page-hidden { display: none; }
+        .page-visible { display: block; }
+
+        /* 通用UI样式 */
+        .game-header {
+            background: #FFF;
+            padding: 12px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        .game-header h1 { margin: 0; font-size: 18px; color: var(--sea-deep); }
+        .btn-icon {
+            background: var(--accent-light);
+            border: none;
+            border-radius: 40px;
+            padding: 6px 16px;
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--sea-deep);
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .btn-icon:active { transform: scale(0.96); }
+        .container { padding: 12px; display: flex; flex-direction: column; gap: 14px; }
+        .question-card {
+            background: var(--card);
+            border-radius: 24px;
+            padding: 16px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            border: 1px solid rgba(0,119,190,0.15);
+        }
+        .question-card.completed { border-color: var(--sea-grey); background: #F4F7FA; }
+        .question-card.completed .q-content { opacity: 0.6; text-decoration: line-through; }
+        .cat-label {
+            font-size: 11px;
+            background: var(--accent-light);
+            color: var(--sea-bright);
+            padding: 4px 10px;
+            border-radius: 30px;
+            font-weight: 800;
+            display: inline-block;
+        }
+        .q-content { font-size: 16px; font-weight: 600; margin: 12px 0 14px; line-height: 1.4; color: #1A2C3E; }
+        .card-controls { display: flex; gap: 8px; flex-wrap: wrap; }
+        .btn-mini {
+            flex: 1;
+            padding: 8px 0;
+            border-radius: 44px;
+            font-size: 11px;
+            font-weight: 700;
+            border: none;
+            cursor: pointer;
+            background: #F0F2F5;
+        }
+        .btn-check.active { background: var(--sea-grey); color: white; }
+        .btn-q { background: var(--sea-deep); color: white; }
+        .btn-cat { background: var(--sea-shallow); color: var(--sea-deep); }
+
+        .library-header {
+            background: #FFF;
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            border-bottom: 1px solid #E2E8F0;
+        }
+        .library-header h2 { margin: 0; font-size: 18px; color: var(--sea-deep); flex: 1; }
+        .topic-count-badge {
+            font-size: 14px;
+            color: #0077BE;
+            background: #E0F2F7;
+            padding: 4px 12px;
+            border-radius: 30px;
+            font-weight: 600;
+        }
+        .topic-accordion { padding: 12px; display: flex; flex-direction: column; gap: 12px; }
+        .topic-item {
+            background: white;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        .topic-title {
+            background: var(--accent-light);
+            padding: 14px 16px;
+            font-weight: 800;
+            font-size: 15px;
+            color: var(--sea-deep);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+        }
+        .topic-arrow { font-size: 18px; transition: transform 0.2s; }
+        .topic-arrow.open { transform: rotate(90deg); }
+        .question-list {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.4s cubic-bezier(0.33, 1, 0.68, 1);
+            background: #FEFEFE;
+        }
+        .question-list.show { max-height: 800px; }
+        .question-item {
+            padding: 12px 16px;
+            border-top: 1px solid #EFF3F8;
+            font-size: 14px;
+            line-height: 1.4;
+            color: #2c3e50;
+        }
+        .drawer-out { animation: drawerOut 0.35s forwards; }
+        @keyframes drawerOut { to { transform: translateY(100%); opacity: 0; } }
+        .slide-left-out { animation: slideLeftOut 0.4s forwards; }
+        @keyframes slideLeftOut { to { transform: translateX(-120%); opacity: 0; } }
+        .shatter-out { animation: shatter 0.5s forwards; }
+        @keyframes shatter { to { transform: translate(var(--tx), var(--ty)) rotate(var(--tr)) scale(0); opacity: 0; } }
+        .card-in { animation: cardIn 0.45s cubic-bezier(0.2, 0.9, 0.4, 1.1) forwards; }
+        @keyframes cardIn { from { opacity: 0; transform: scale(0.92) translateY(12px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+    </style>
+</head>
+<body>
+
+<div id="lang-home" class="lang-home">
+    <div class="lang-card">
+        <div class="lang-buttons">
+            <button class="lang-btn" data-lang="zh">中文</button>
+            <button class="lang-btn" data-lang="en">English</button>
+            <button class="lang-btn" data-lang="tr">Türkçe</button>
+            <button class="lang-btn" data-lang="id">Bahasa Indonesia</button>
+        </div>
+    </div>
+</div>
+
+<div id="app-wrapper"></div>
+
+<script>
+// ======================= 1. 中文词库（完整） =======================
+const ZH_POOL = {
+  "周末怎么过": ["你周末一般睡到几点？","最近有没有追什么好看的剧？","下雨的周末你喜欢做什么？","一个人过周末会觉得无聊吗？","你更愿意出门玩还是宅在家里？"],
+  "通勤路上": ["你每天通勤要花多长时间？","路上喜欢听歌还是听播客？","有没有在车上遇到过有意思的事？","你觉得怎样才能让通勤不那么累？","如果通勤时间能用来学东西，你想学什么？"],
+  "外卖和做饭": ["你一周点几次外卖？","最拿手的一道菜是什么？","有没有因为太懒不想做饭的时候？","你愿意为了一顿好吃的排队很久吗？","你觉得外卖和家常菜哪个更让人安心？"],
+  "熬夜那些事": ["你一般几点睡觉才算正常？","最近一次熬夜是因为什么？","熬夜之后第二天怎么补救？","你觉得早睡早起真的比熬夜好吗？","有没有什么办法能让自己早点放下手机？"],
+  "手机依赖": ["你每天看手机大概多久？","出门忘记带手机会不会焦虑？","你用什么App花的时间最多？","有没有试过刻意减少手机时间？","你觉得刷短视频算浪费还是放松？"],
+  "购物习惯": ["你更爱逛实体店还是网购？","有没有买完就后悔的东西？","你会因为打折买不需要的东西吗？","什么东西你愿意花大价钱买好的？","最近买的一件满意的东西是什么？"],
+  "宠物和陪伴": ["你养过宠物吗？","你最想养什么宠物？","你觉得宠物能缓解孤独感吗？","有没有觉得照顾宠物挺麻烦的时候？","跟宠物相处让你学到了什么？"],
+  "朋友相处": ["你和最好的朋友多久见一次？","朋友找你借钱你会怎么处理？","你觉得朋友之间需要经常联系吗？","有没有因为小事和朋友闹过别扭？","什么样的人你绝对不会当朋友？"],
+  "家庭关系": ["你多久给家里打一次电话？","和父母住一起会觉得不自由吗？","家里谁最懂你？","你有没有对家人说过比较伤人的话？","你觉得家人应该无条件支持你吗？"],
+  "职场新人": ["你第一份工作是怎么找到的？","刚上班时有没有犯过尴尬的错误？","你觉得新人最需要注意什么？","有没有被老员工欺负过？","你愿意做职场里那个多干活的人吗？"],
+  "工作压力": ["你最近觉得工作累吗？","压力大的时候你怎么调节？","你有没有想过干脆辞职算了？","你觉得加班是应该的还是无奈的？","什么样的工作会让你觉得有成就感？"],
+  "老板和领导": ["你遇到过最好的老板是什么样的？","怎么和被领导意见不合的时候？","你更怕严厉的老板还是冷漠的？","你觉得领导应该和员工打成一片吗？","有没有因为老板的一句话感动过？"],
+  "同事关系": ["你和同事私下会一起玩吗？","同事在你面前吐槽别人你怎么接？","你觉得职场能交到真朋友吗？","有没有被同事背后说过闲话？","离职后你还会和以前的同事联系吗？"],
+  "面试经历": ["你经历过最难忘的面试是什么？","面试被问到不会的问题怎么办？","你觉得面试看的是能力还是眼缘？","有没有因为紧张说错过话？","你对现在的招聘流程有什么不满意？"],
+  "工资和钱": ["你工作后的第一笔工资怎么花的？","你觉得赚多少钱才算够？","你会为了高薪换不喜欢的工作吗？","你有没有存钱的习惯？","钱能买到快乐吗？"],
+  "租房那些事": ["你租过几次房子？","遇到过最奇葩的房东是什么样？","你觉得合租好还是独居好？","搬家是不是你最烦的事？","你对租房有什么底线要求？"],
+  "买房想法": ["你想在哪个城市买房？","你觉得年轻人一定要买房吗？","如果房价降了你会立刻买吗？","买房这件事让你焦虑过吗？","你觉得租房一辈子可以接受吗？"],
+  "旅行计划": ["下一个想去的地方是哪里？","你喜欢做详细攻略还是走到哪算哪？","有没有因为太累不想去玩的旅行？","你觉得旅行最重要的是吃还是风景？","有没有和旅伴在路上吵过架？"],
+  "独自旅行": ["你一个人旅行过吗？","独自旅行最大的好处是什么？","一个人出去玩会不会觉得孤单？","你会和陌生人结伴一起走吗？","给没试过独自旅行的人一个建议"],
+  "省钱妙招": ["你觉得怎样能有效省钱？","有没有为了省钱做过什么特别的事？","你觉得记账有用吗？","省钱和省时间你更看重哪个？","有没有买过平替后发现其实挺好的？"],
+  "理财观念": ["你买过基金或者股票吗？","亏钱的时候你怎么调整心态？","你觉得理财是必须学的技能吗？","你会把钱放余额宝还是定期？","有没有因为听别人推荐赔过钱？"],
+  "生日传统": ["你过生日会吃蛋糕吗？","有没有哪次生日让你特别难忘？","你会不会一个人过生日？","你更在乎生日有人陪还是礼物？","你觉得生日应该庆祝还是随便过？"],
+  "节日氛围": ["你最喜欢哪个节日？","感觉现在过年还有味道吗？","你会不会觉得过节反而很累？","有没有一个节日你完全不想过？","你觉得节日最重要的是和家人一起吗？"],
+  "礼物挑选": ["你觉得自己挑礼物眼光好吗？","收到过最离谱的礼物是什么？","送礼物你更在意实用还是心意？","你会因为不会挑礼物而焦虑吗？","你觉得直接问对方要什么礼物好吗？"],
+  "社交场合": ["你在聚会里是话多还是话少？","有没有在社交场合觉得特别尴尬？","你觉得敬酒是必须的吗？","你会为了合群做不想做的事吗？","参加婚礼你觉得最无聊的部分是什么？"],
+  "独处时光": ["你喜欢独处吗？","你一个人会做什么？","独处太久会觉得闷吗？","你觉得独处和孤独是一回事吗？","有没有哪次一个人做某件事特别快乐？"],
+  "回忆过去": ["你小学时最好的朋友还记得吗？","如果有机会回到过去你想回到什么时候？","你后悔做过什么决定吗？","小时候的梦想现在还记得吗？","你觉得童年和现在哪个更快乐？"],
+  "焦虑时刻": ["你最近因为什么事焦虑过？","焦虑的时候你会找谁聊？","你觉得运动能缓解焦虑吗？","有没有什么歌能让你瞬间平静？","你觉得自己比同龄人更焦虑吗？"],
+  "快乐来源": ["什么事情能让你立刻开心？","你觉得快乐和钱有关系吗？","你每天都会笑吗？","最近一次大笑是因为什么？","你觉得分享快乐会加倍吗？"],
+  "改变自己": ["你想改掉自己哪个坏习惯？","有没有成功改变过自己的经历？","你觉得性格能彻底改变吗？","别人说过你最需要改的地方是什么？","你想成为什么样的人？"],
+  "拖延症": ["你有没有把事情拖到最后一刻的经历？","你觉得拖延是因为懒还是怕做不好？","有没有什么方法能治好拖延？","你会在截止日前一天赶工吗？","拖延之后你会责怪自己吗？"],
+  "早起困难": ["你早上闹钟响几次能起来？","有没有因为起不来迟到过？","你觉得早起真的能改变人生吗？","你是夜猫子还是百灵鸟？","有什么办法让你心甘情愿早起？"],
+  "健身运动": ["你平时会运动吗？","办过健身卡却坚持不下来吗？","你喜欢一个人运动还是和别人一起？","有没有特别享受某种运动？","运动后你觉得心情会变好吗？"],
+  "饮食习惯": ["你挑食吗？","有什么食物你完全接受不了？","你吃饭快还是慢？","你会为了健康吃不喜欢的食物吗？","你觉得一日三餐必须规律吗？"],
+  "皮肤护理": ["你每天花多少时间护肤？","你有没有因为熬夜爆痘的经历？","你用过最贵的护肤品是什么？","你觉得护肤品是智商税吗？","有没有一招让皮肤变好的秘诀？"],
+  "穿衣风格": ["你平时的穿衣风格是什么？","你会为了场合特意打扮吗？","你衣柜里最多的是哪种衣服？","你有没有买过很贵但没穿几次的衣服？","你觉得自己穿什么最好看？"],
+  "发型故事": ["你换过最夸张的发型是什么？","有没有剪完头发后悔的经历？","你多久剪一次头发？","你觉得发型对一个人的影响大吗？","你会自己剪头发吗？"],
+  "拍照修图": ["你手机里照片多吗？","你拍照会修图吗？","你会不会为了发朋友圈拍很多张？","你觉得自己不上相吗？","你觉得原图好看还是修过的好？"],
+  "短视频刷不停": ["你每天刷短视频多久？","有没有刷着刷着就过去两小时？","你觉得短视频让你更开心还是更空虚？","你有没有因为短视频学到一个新技能？","你觉得应该卸载短视频App吗？"],
+  "游戏沉迷": ["你玩网络游戏吗？","有没有因为打游戏熬夜到天亮？","你觉得游戏是放松还是逃避？","玩游戏花钱你觉得值吗？","游戏里你会和陌生人聊天吗？"],
+  "读书习惯": ["你一年大概读几本书？","最近读完的一本是什么？","你更喜欢纸质书还是电子书？","有没有一本书改变过你的想法？","你觉得读书是为了知识还是放松？"],
+  "追剧停不下来": ["你最近在追什么剧？","有没有因为追剧熬夜到很晚？","你会不会一部剧反复看好几遍？","你觉得现在的剧越来越不好看了吗？","你是快进派还是原速派？"],
+  "电影口味": ["你最喜欢什么类型的电影？","有没有一部电影你看了很多遍？","你会一个人去电影院吗？","你觉得好电影最重要的是什么？","有没有电影让你哭过？"],
+  "音乐偏爱": ["你最喜欢听谁的歌？","有没有一首歌你一直循环？","你会因为歌词喜欢一首歌吗？","你开车或走路时会哼歌吗？","你还记得第一次买的专辑吗？"],
+  "演唱会经历": ["你看过谁的演唱会？","有没有因为抢票失败很沮丧？","你觉得演唱会值得花那么多钱吗？","跟喜欢的人一起看演唱会是什么感觉？","你有没有在现场哭过？"],
+  "兴趣爱好": ["你最近有什么新爱好吗？","有没有一个爱好坚持了三年以上？","你觉得爱好应该赚钱还是纯玩？","你有没有因为爱好认识新朋友？","什么样的爱好你会一直做下去？"],
+  "手作和DIY": ["你喜欢做手工吗？","你有没有自己做过什么小东西？","你觉得DIY比买现成的更有意义吗？","你手巧还是手残？","有没有做过送人的手工礼物？"],
+  "学新东西": ["你最近在学什么新技能？","有没有学了一半就放弃的？","你觉得成年人学东西更难了吗？","你有没有靠自学做成过一件事？","你想学但一直没行动的事是什么？"],
+  "语言学习": ["你会说几种语言？","有没有学过外语最后都忘了？","你觉得学语言天赋重要还是努力重要？","你看剧会刻意不开字幕吗？","你有没有和外国人聊天的经历？"],
+  "公开演讲": ["你上台演讲会紧张吗？","有没有在很多人面前说过话？","你觉得怎么克服紧张最有效？","你有没有演讲时忘词过？","你愿意做职场里那个发言的人吗？"],
+  "开会体验": ["你觉得大多数开会是浪费时间吗？","有没有在会上下班偷偷做过别的事？","你会在会上主动发言吗？","你觉得开会应该站着还是坐着？","有没有开过特别无聊的会？"],
+  "邮件礼仪": ["你一天收多少封工作邮件？","你回邮件会拖很久吗？","你觉得邮件应该简洁还是详细？","你有没有发错邮件给不该发的人？","下班后你还会看工作邮件吗？"],
+  "辞职经历": ["你有没有辞过职？","你辞职的原因是什么？","有没有裸辞过？后悔吗？","你觉得应该找好下家再辞职吗？","辞职时你怎么跟老板说的？"],
+  "职业选择": ["你当初为什么选这个行业？","你有没有想过转行？","你觉得选工作更看重钱还是兴趣？","你职业上最大的困惑是什么？","你希望十年后自己在做什么？"],
+  "副业想法": ["你有副业吗？","你想过做什么副业？","你觉得做副业会影响主业吗？","你做副业是为了兴趣还是钱？","有没有副业做成主业的可能？"],
+  "创业冲动": ["你有没有想过自己创业？","你觉得创业最大的风险是什么？","你身边有创业成功的朋友吗？","如果给你一笔钱你会开什么店？","你觉得打工和创业哪个更累？"],
+  "第一桶金": ["你第一次赚钱是什么时候？","你的第一桶金是怎么赚到的？","拿到第一笔收入你是怎么花的？","你觉得年轻人应该多赚钱还是多学习？","你有没有想过怎么赚更多钱？"],
+  "消费升级": ["你最近买了什么提升幸福感的东西？","你觉得什么东西值得买贵的？","你有没有买过觉得“贵有贵的道理”的东西？","消费降级你觉得可行吗？","你愿意为服务花钱吗？"],
+  "断舍离": ["你有过断舍离的经历吗？","你觉得家里东西太多会影响心情吗？","你有没有舍不得扔但又没用的东西？","扔东西会让你觉得轻松还是愧疚？","你觉得极简生活真的快乐吗？"],
+  "厨房翻车": ["你有没有做饭翻车的经历？","最惨的一次厨房事故是什么？","你还记得第一次做饭是几岁吗？","你觉得自己有做饭天赋吗？","你做饭是凭感觉还是看菜谱？"],
+  "甜品控": ["你爱吃甜食吗？","你觉得心情不好的时候吃甜食有用吗？","有没有一种甜品你永远吃不腻？","你试过自己做蛋糕或饼干吗？","你觉得奶茶是快乐水还是卡路里炸弹？"],
+  "咖啡习惯": ["你每天喝咖啡吗？","你觉得不喝咖啡能醒过来吗？","你喜欢美式还是拿铁？","你会为了好喝的咖啡专门去一家店吗？","你有没有喝咖啡喝到睡不着？"],
+  "酒桌文化": ["你能喝酒吗？","你觉得酒桌劝酒是可以拒绝的吗？","你喝醉过吗？什么感觉？","你觉得不喝酒的人在聚会会被孤立吗？","你有没有因为不想喝酒假装感冒过？"],
+  "童年零食": ["你小时候最爱吃什么零食？","现在还能买到小时候的零食吗？","你有没有为了集卡买过很多干脆面？","你觉得以前的零食好吃还是现在的好吃？","你还会吃辣条吗？"],
+  "外卖踩雷": ["你有没有点过很难吃的外卖？","你点外卖会看差评吗？","有没有因为图片好看但实物很失望？","你最不能接受外卖有什么问题？","你会因为外卖包装好看给好评吗？"],
+  "餐厅排队": ["你愿意为了好吃的排队多久？","有没有排了很久队但觉得不值得？","你会因为不想排队放弃想吃的店吗？","你觉得网红餐厅值得打卡吗？","你有没有为了吃饭开车很远？"],
+  "健康焦虑": ["你觉得自己身体还好吗？","你有没有因为熬夜身体出现状况？","你已经多久没体检了？","你会因为看健康科普变得焦虑吗？","你觉得年轻可以随便作吗？"],
+  "睡眠质量": ["你觉得自己睡眠质量好吗？","你会做梦吗？还记得吗？","你有没有失眠过？失眠时想什么？","你觉得睡前玩手机影响睡眠吗？","有什么方法能睡得更香？"],
+  "生病经历": ["你最近一次生病是什么时候？","你生病时会一个人扛还是去医院？","你觉得生病时最需要的是什么？","你有没有因为小病拖成大病的经历？","你怕打针吗？"],
+  "基因和长相": ["你觉得自己长得像谁？","你爸妈有没有说过你哪点像他们？","你有没有特别羡慕别人的长相？","你觉得长相重要还是气质重要？","你有整形的想法吗？"],
+  "身高体重": ["你对现在的身高满意吗？","你有没有过体重焦虑？","你减肥最狠的时候是什么样？","你觉得瘦了真的会更好看吗？","你会在意对象的身高吗？"],
+  "穿衣自由": ["你觉得穿衣自由重要吗？","你有没有因为别人眼光放弃穿某件衣服？","你在公司会注意穿着吗？","你敢穿得很亮眼出门吗？","你觉得什么场合该穿什么重要吗？"],
+  "化妆出门": ["你出门会化妆吗？","你觉得素颜出门有压力吗？","你化妆最快需要多久？","你有没有因为化妆迟到过？","你觉得化妆是为了自己还是别人？"],
+  "男生护肤": ["你觉得男生应该护肤吗？","你身边护肤的男生多吗？","男生化妆你能接受吗？","你觉得男生用护肤品会不会奇怪？","你会给男朋友买护肤品吗？"],
+  "情侣吵架": ["你和对象吵架最久的一次多久？","吵架后你会先低头吗？","你觉得冷战能解决问题吗？","有没有因为小事闹得很大？","你觉得吵架也有好的地方吗？"],
+  "相亲经历": ["你相过亲吗？","遇到最尴尬的相亲对象是什么样？","你觉得相亲能找到真爱吗？","你会因为家人催而去相亲吗？","相亲第一次见面你会聊什么？"],
+  "异地恋": ["你能接受异地恋吗？","你觉得异地恋最大的困难是什么？","你有没有异地恋成功的朋友？","你觉得手机能维持感情吗？","异地恋值得坚持吗？"],
+  "婚姻看法": ["你想结婚吗？","你觉得多大结婚比较合适？","你觉得结婚一定要买房吗？","你爸妈催过你结婚吗？","你觉得不结婚会怎样？"],
+  "婚礼想象": ["你想要什么样的婚礼？","你觉得办婚礼是必须的吗？","你会选择旅行结婚吗？","你参加过最难忘的婚礼是什么？","你觉得份子钱该不该还？"],
+  "生娃想法": ["你想要小孩吗？","你觉得生几个合适？","你怕带小孩吗？","你觉得要小孩是因为喜欢还是因为传统？","你有没有想过做丁克？"],
+  "育儿观念": ["你觉得打小孩可以吗？","你赞同快乐教育还是严格教育？","你觉得小孩应该学才艺吗？","你会让小孩玩手机吗？","你觉得父母应该替孩子做决定吗？"],
+  "和父母相处": ["你和父母吵架过吗？","你多久回一次家？","你觉得父母懂你吗？","你有没有想对父母说却说不出口的话？","你觉得应该按父母的期望生活吗？"],
+  "兄弟姐妹": ["你有兄弟姐妹吗？","你觉得有兄弟姐妹好还是独生好？","你和兄弟姐妹关系好吗？","你会帮兄弟姐妹的忙吗？","你有没有觉得父母偏心过？"],
+  "祖辈回忆": ["你小时候和爷爷奶奶住过吗？","你最记得祖辈教你的什么？","你有没有后悔没多陪陪他们？","你觉得隔代亲是真的吗？","你会给祖辈打电话吗？"],
+  "搬家记忆": ["你搬过几次家？","你记得小时候住的地方吗？","搬家最让你舍不得的是什么？","你有没有因为搬家丢掉很重要的东西？","你觉得自己有家的概念吗？"],
+  "故乡情怀": ["你的故乡是哪？","你多久回一次老家？","你觉得故乡变化大吗？","你有没有想回老家发展的念头？","你觉得故乡是回不去的地方吗？"],
+  "城市选择": ["你为什么留在现在这个城市？","你想去哪个城市生活？","你觉得大城市和小城市哪个更好？","你有没有因为一个人去一个城市？","你习惯现在这个城市的生活节奏吗？"],
+  "租房搬家": ["你搬家最怕什么？","你找房子最看重什么？","你有没有因为房东提前退租过？","你和合租室友相处好吗？","你觉得独居安全吗？"],
+  "邻居关系": ["你和邻居认识吗？","你遇到过奇葩邻居吗？","你会因为邻居吵而投诉吗？","你觉得邻里关系重要吗？","你会主动和邻居打招呼吗？"],
+  "公共交通": ["你平时坐地铁还是公交？","你在车上看手机会坐过站吗？","你最不能接受车上的什么行为？","你有没有在车上给人让过座？","你觉得公共交通需要更文明吗？"],
+  "开车体验": ["你有驾照吗？","你经常开车吗？","你有没有遇到过路怒症？","你觉得开车累还是坐车累？","你最喜欢开什么路？"],
+  "考驾照": ["你考驾照考了几次？","你觉得哪个科目最难？","你有没有被教练骂哭过？","你花了多久拿到驾照？","你觉得考驾照应该更严格吗？"],
+  "走路散步": ["你喜欢走路吗？","你饭后会散步吗？","你有没有漫无目的走过很久？","你觉得走路能让人想清楚事情吗？","你一个人走路时会想什么？"],
+  "雨天心情": ["你喜欢下雨天吗？","下雨天你会不想出门吗？","你觉得雨天适合做什么？","你有没有在雨里跑过？","下雨天让你觉得安静吗？"],
+  "晴天活动": ["晴天你最喜欢做什么？","你会因为天气好特意出门吗？","你有没有说走就走因为天气好？","你觉得晴天能让人心情变好吗？","大太阳和阴天你选哪个？"],
+  "秋冬季节": ["你喜欢秋天还是冬天？","你觉得冬天最难的是什么？","你有没有因为太冷不想起床？","你喜欢穿厚衣服裹着的感觉吗？","冬天你最想吃什么？"],
+  "春夏季节": ["你喜欢春天还是夏天？","夏天你怕热吗？","你最喜欢夏天的什么？","春天你会觉得困吗？","换季时你会过敏吗？"],
+  "新年计划": ["你每年会做新年计划吗？","去年的计划完成了吗？","你觉得新年计划有用吗？","你今年最想做的一件事是什么？","你有没有坚持很久的计划？"],
+  "咖啡馆与饮品店": ["你平时喜欢去咖啡馆吗？","点咖啡你是看名字还是看口味？","有没有哪家店的氛围让你特别喜欢？","你觉得咖啡馆适合工作还是聊天？","一个人去咖啡店会觉得奇怪吗？"],
+  "网购与快递": ["你平均一个月收几个快递？","有没有因为拆快递心情变好过？","你会因为包邮而多买不需要的东西吗？","快递到了但一直不拆是什么心理？","你觉得网购和实体店哪个更让人上瘾？"]
+};
+
+// ======================= 2. 英文词库（完整） =======================
+const EN_POOL = {
+  "Weekend Plans": ["What time do you usually wake up on weekends?","Have you been binge-watching any good series lately?","What do you like to do on a rainy weekend?","Do you find weekends boring when you're alone?","Do you prefer going out or staying home on weekends?"],
+  "Commute": ["How long does your daily commute take?","Do you listen to music or podcasts on the way?","Ever noticed something interesting during your commute?","How do you think commuting could be less tiring?","If you could learn something during commute, what would it be?"],
+  "Takeout & Cooking": ["How many times a week do you order takeout?","What's your best homemade dish?","Do you have days when you're too lazy to cook?","Would you wait in a long line for amazing food?","Which feels more comforting: takeout or home cooking?"],
+  "Late Nights": ["What time is 'normal' for you to go to sleep?","What made you stay up late recently?","How do you recover after staying up late?","Do you think early to bed is really better than late nights?","Any tricks to put your phone down earlier?"],
+  "Phone Habits": ["How much time do you spend on your phone daily?","Would you feel anxious forgetting your phone at home?","Which app do you use the most?","Have you ever tried to reduce screen time?","Do you think short videos are a waste or relaxation?"],
+  "Shopping Habits": ["Do you prefer physical stores or online shopping?","Ever bought something and regretted it immediately?","Do you buy things you don't need just because they're on sale?","What kind of item are you willing to splurge on?","What's the last thing you bought that you really love?"],
+  "Pets & Companionship": ["Have you ever owned a pet?","What pet would you love to have?","Do you think pets help with loneliness?","Ever felt that taking care of a pet is troublesome?","What has having a pet taught you?"],
+  "Friendship Dynamics": ["How often do you see your best friend?","What would you do if a friend asked to borrow money?","Do friends need to stay in constant touch?","Have you ever had a fallout over something small?","What kind of person would you never be friends with?"],
+  "Family Bonds": ["How often do you call your family?","Do you feel less freedom living with parents?","Who in your family understands you best?","Have you ever said hurtful words to a family member?","Should family support you unconditionally?"],
+  "Workplace Newcomer": ["How did you land your first job?","Did you ever make an embarrassing mistake as a newbie?","What's the most important thing for a newcomer to know?","Have you ever been treated unfairly by senior colleagues?","Would you be the one who does extra work willingly?"],
+  "Work Pressure": ["Do you feel exhausted from work lately?","How do you unwind when stress is high?","Ever thought of just quitting?","Is overtime necessary or just inevitable?","What kind of work gives you a sense of achievement?"],
+  "Boss & Leadership": ["What's the best boss you've ever had?","How do you handle disagreements with your leader?","Would you prefer a strict boss or an indifferent one?","Should leaders be friends with their team?","Has a boss ever said something that touched you?"],
+  "Colleagues": ["Do you hang out with colleagues after work?","How do you react when a colleague gossips about others?","Can you make real friends at work?","Ever been the subject of office gossip?","Do you keep in touch with former colleagues?"],
+  "Interview Stories": ["What's your most memorable job interview?","What do you do when you don't know an answer?","Do interviews test ability or chemistry?","Ever messed up your words because of nerves?","What frustrates you about current hiring processes?"],
+  "Money & Salary": ["How did you spend your first paycheck?","How much money would be 'enough' for you?","Would you take a boring job just for higher pay?","Do you have a habit of saving money?","Can money buy happiness?"],
+  "Renting Stories": ["How many times have you rented a place?","What's the strangest landlord you've met?","Do you prefer sharing or living alone?","Is moving the most annoying thing for you?","What's your bottom line when renting?"],
+  "Buying a Home": ["Which city would you like to buy a home in?","Do young people absolutely need to buy a home?","If prices dropped, would you buy immediately?","Has the thought of buying a home made you anxious?","Could you accept renting for a lifetime?"],
+  "Travel Plans": ["Where's your next dream destination?","Do you plan every detail or go with the flow?","Ever felt too tired to enjoy a trip?","What matters more when traveling: food or sights?","Have you argued with travel companions on a trip?"],
+  "Solo Travel": ["Have you ever traveled alone?","What's the best thing about solo travel?","Does traveling alone ever feel lonely?","Would you team up with strangers on the road?","Give one piece of advice for first-time solo travelers."],
+  "Money Saving Tips": ["What's an effective way to save money?","Have you done anything unusual to save?","Do you think budgeting apps help?","What do you value more: saving money or saving time?","Ever bought a cheaper alternative and liked it more?"],
+  "Financial Mindset": ["Have you ever bought stocks or funds?","How do you keep calm after losing money?","Is financial literacy a must-have skill?","Do you keep money in savings accounts or fixed deposits?","Ever lost money after following someone's tip?"],
+  "Birthday Traditions": ["Do you eat cake on your birthday?","Which birthday stands out as unforgettable?","Would you celebrate your birthday alone?","Do you prefer company or presents on your birthday?","Should birthdays be celebrated lavishly or casually?"],
+  "Festival Vibes": ["What's your favorite holiday?","Does New Year still feel special to you?","Do you find festivals exhausting sometimes?","Is there any festival you'd rather skip?","Is it most important to be with family during festivals?"],
+  "Gift Giving": ["Do you think you're good at picking gifts?","What's the weirdest gift you've received?","Do you prioritize practicality or sentiment in gifts?","Does choosing gifts make you anxious?","Is it okay to just ask someone what they want?"],
+  "Social Situations": ["Are you talkative or quiet at parties?","Ever felt super awkward in a social setting?","Is toasting obligatory in your culture?","Would you do things you dislike just to fit in?","What's the most boring part of attending weddings?"],
+  "Alone Time": ["Do you enjoy solitude?","What do you like to do when you're alone?","Do you feel down after being alone too long?","Is being alone the same as feeling lonely?","Describe a time you did something alone and loved it."],
+  "Looking Back": ["Do you still remember your best friend from elementary school?","If you could go back in time, which year would you choose?","Do you regret any decision you've made?","Do you remember your childhood dreams?","Was childhood happier than adulthood?"],
+  "Moments of Anxiety": ["What has made you anxious recently?","Who do you talk to when you're anxious?","Does exercise help relieve anxiety?","Any song that instantly calms you down?","Do you feel more anxious than your peers?"],
+  "Sources of Joy": ["What can instantly make you happy?","Are happiness and money related?","Do you laugh every day?","What made you laugh out loud recently?","Does sharing happiness double it?"],
+  "Self-Improvement": ["What bad habit would you like to break?","Have you ever successfully changed yourself?","Can personality really change completely?","What do others say you should change most?","What kind of person do you want to become?"],
+  "Procrastination": ["Ever left things until the very last minute?","Is procrastination due to laziness or fear of failure?","What's a method that helps with procrastination?","Do you often work furiously the night before a deadline?","Do you blame yourself after procrastinating?"],
+  "Struggle to Wake Up": ["How many alarms do you need in the morning?","Ever been late because you couldn't get up?","Do you think early rising changes your life?","Are you a night owl or a morning lark?","What would make you willing to wake up early?"],
+  "Fitness & Exercise": ["Do you exercise regularly?","Have you ever paid for a gym membership but not used it?","Do you prefer exercising alone or with others?","Is there a sport or activity you truly enjoy?","Does exercise improve your mood?"],
+  "Eating Habits": ["Are you a picky eater?","What food can you absolutely not stand?","Do you eat fast or slowly?","Would you eat something healthy but unpleasant?","Does your eating schedule need to be regular?"],
+  "Skincare Routine": ["How much time do you spend on skincare daily?","Have you had breakouts from staying up late?","What's the most expensive skincare you've used?","Is skincare mostly marketing hype?","What's your one tip for better skin?"],
+  "Fashion Style": ["How would you describe your daily style?","Do you dress up for specific occasions?","What type of clothing fills your wardrobe most?","Ever bought an expensive piece but rarely wore it?","What do you think you look best in?"],
+  "Hair Stories": ["What's the wildest hairstyle you've had?","Ever regretted a haircut immediately?","How often do you get a haircut?","Does a hairstyle strongly affect your appearance?","Would you cut your own hair?"],
+  "Photo Editing": ["Do you have many photos on your phone?","Do you edit your photos before posting?","Do you take many shots just for social media?","Do you think you're not photogenic?","Do you prefer natural or edited photos?"],
+  "Scrolling Short Videos": ["How long do you scroll short videos each day?","Ever lost two hours without noticing?","Do short videos make you happier or emptier?","Learned any new skill from short videos?","Should we delete short video apps?"],
+  "Gaming": ["Do you play online games?","Ever stayed up all night gaming?","Is gaming a form of relaxation or escape?","Is spending money on games worth it?","Do you chat with strangers while gaming?"],
+  "Reading Habits": ["About how many books do you read per year?","What's the last book you finished?","Do you prefer paper books or e-books?","Has a book ever changed your perspective?","Is reading for knowledge or for fun?"],
+  "Binge-Watching": ["What series are you currently watching?","Ever stayed up too late binge-watching?","Do you rewatch favorite shows multiple times?","Do you think shows are getting worse?","Do you skip forward or watch at normal speed?"],
+  "Movie Taste": ["What's your favorite movie genre?","Is there a movie you've watched many times?","Would you go to the cinema alone?","What makes a movie truly great?","Has a movie ever made you cry?"],
+  "Music Favorites": ["Who's your favorite singer or band?","Is there a song you keep on repeat?","Do lyrics make you love a song more?","Do you hum while driving or walking?","Do you remember the first album you bought?"],
+  "Concert Experiences": ["Whose concert have you been to?","Ever felt frustrated failing to get tickets?","Are concerts worth the high cost?","What's it like watching a concert with someone you love?","Have you ever cried at a concert?"],
+  "Hobbies": ["Do you have any recent new hobby?","Is there a hobby you've kept for over three years?","Should hobbies be profitable or purely for fun?","Met any new friends through a hobby?","What hobby would you never quit?"],
+  "DIY & Crafts": ["Do you enjoy making things by hand?","Have you made something yourself?","Is DIY more meaningful than buying?","Are you crafty or clumsy with tools?","Ever made a handmade gift for someone?"],
+  "Learning New Things": ["What new skill are you learning lately?","Ever given up halfway through learning something?","Is it harder for adults to learn new things?","Have you taught yourself something successfully?","What's something you've always wanted to learn but haven't?"],
+  "Language Learning": ["How many languages can you speak?","Learned a foreign language and then forgotten it?","Is language learning more about talent or effort?","Do you try to watch shows without subtitles?","Ever had a conversation with a foreigner?"],
+  "Public Speaking": ["Do you get nervous speaking on stage?","Have you spoken in front of a large crowd?","What's the best way to overcome speaking anxiety?","Ever forgotten your words during a speech?","Do you volunteer to speak up at work?"],
+  "Meeting Culture": ["Do you think most meetings waste time?","Ever secretly done other things during a meeting?","Do you speak up actively in meetings?","Should meetings be held standing up?","Ever sat through an incredibly boring meeting?"],
+  "Email Etiquette": ["How many work emails do you receive daily?","Do you delay replying to emails?","Should emails be concise or detailed?","Ever sent an email to the wrong person?","Do you check work emails after hours?"],
+  "Resignation Experience": ["Have you ever quit a job?","What made you quit?","Ever resigned without another job lined up? Regret it?","Is it better to find a new job before quitting?","How did you tell your boss you were leaving?"],
+  "Career Choices": ["Why did you choose your current field?","Have you ever thought about changing industries?","What matters more: salary or interest?","What's your biggest career confusion right now?","Where do you see yourself in ten years?"],
+  "Side Hustle Ideas": ["Do you have a side hustle?","What side hustle have you considered?","Could a side hustle affect your main job?","Do you do side jobs for money or passion?","Could your side hustle become your main job?"],
+  "Entrepreneurship Urge": ["Have you ever thought about starting a business?","What's the biggest risk of entrepreneurship?","Do you know anyone who succeeded in starting a business?","If given money, what shop would you open?","Which is more exhausting: working for someone or for yourself?"],
+  "First Earnings": ["When did you first earn money?","How did you make your first income?","What did you spend your first earnings on?","Should young people focus on earning or learning?","Have you thought about how to earn more?"],
+  "Upgraded Spending": ["What have you bought recently that boosted happiness?","What kind of items are worth paying more for?","Ever bought something expensive and felt it was totally worth it?","Do you think spending less is realistic?","Are you willing to pay for good service?"],
+  "Decluttering": ["Have you ever gone through a decluttering phase?","Does too much stuff at home affect your mood?","Do you have things you can't throw away but never use?","Does throwing things away make you feel lighter or guilty?","Do you think minimalism leads to happiness?"],
+  "Kitchen Disasters": ["Ever had a cooking disaster?","What's your worst kitchen accident?","How old were you when you first cooked?","Do you have natural cooking talent?","Do you cook by feeling or by recipe?"],
+  "Sweet Tooth": ["Do you love sweets?","Does eating sweets help when you're down?","Is there a dessert you never get tired of?","Have you tried making cakes or cookies yourself?","Is bubble tea happiness or a calorie bomb?"],
+  "Coffee Habit": ["Do you drink coffee every day?","Can you wake up without coffee?","Do you prefer Americano or latte?","Would you go to a specific cafe just for good coffee?","Ever had too much coffee and couldn't sleep?"],
+  "Drinking Culture": ["Can you drink alcohol?","Is it okay to refuse when someone urges you to drink?","Have you ever been drunk? How did it feel?","Do non-drinkers feel left out at parties?","Ever pretended to be sick to avoid drinking?"],
+  "Childhood Snacks": ["What snack did you love as a kid?","Can you still find those childhood snacks today?","Ever bought instant noodles just for the cards?","Were snacks better before or now?","Do you still eat spicy chips?"],
+  "Takeout Disasters": ["Ever ordered takeout that was terrible?","Do you read negative reviews before ordering?","Ever been disappointed by a picture vs reality?","What's the worst takeout problem you can't stand?","Would you give a good rating for nice packaging?"],
+  "Restaurant Lines": ["How long would you queue for great food?","Ever queued long and felt it wasn't worth it?","Would you skip a restaurant just to avoid the line?","Are viral internet-famous restaurants worth trying?","Ever driven far just to eat somewhere?"],
+  "Health Anxiety": ["Do you feel your health is okay?","Has lack of sleep caused health issues for you?","How long since your last check-up?","Do health articles make you anxious?","Is it okay to abuse your body when young?"],
+  "Sleep Quality": ["How's your sleep quality these days?","Do you dream often? Do you remember dreams?","Ever had insomnia? What do you think about?","Does looking at your phone before bed affect sleep?","Any tips for sleeping better?"],
+  "Being Sick": ["When were you last sick?","Do you tough it out alone or go to a doctor?","What do you need most when you're ill?","Ever let a minor illness become serious because you ignored it?","Are you afraid of injections?"],
+  "Looks & Genes": ["Who do you look like in your family?","Do your parents point out similarities?","Do you envy anyone's appearance?","What matters more: looks or personality?","Have you ever thought about plastic surgery?"],
+  "Height & Weight": ["Are you satisfied with your height?","Ever felt anxious about your weight?","What's the most extreme thing you've done to lose weight?","Do you think being thinner makes you more attractive?","Does your partner's height matter to you?"],
+  "Fashion Freedom": ["Is freedom in clothing important to you?","Ever avoided wearing something because of others' opinions?","Do you dress carefully for work?","Would you wear something bold and bright outside?","Does occasion dictate what you wear?"],
+  "Wearing Makeup": ["Do you wear makeup when going out?","Do you feel pressure to go bare-faced?","How fast can you do your makeup?","Ever been late because of makeup?","Is makeup for yourself or for others?"],
+  "Men's Skincare": ["Should men do skincare?","Do many men around you use skincare products?","Can you accept men wearing makeup?","Is it strange for men to use skincare?","Would you buy skincare for your boyfriend?"],
+  "Couple Arguments": ["What's the longest argument you've had with your partner?","Do you apologize first after a fight?","Does silent treatment solve anything?","Ever had a huge blowup over something small?","Can arguments be good for a relationship?"],
+  "Blind Dates": ["Have you ever been on a blind date?","What's the most awkward blind date you've had?","Can true love come from blind dates?","Would you go on blind dates because of family pressure?","What do you talk about on a first blind date?"],
+  "Long-Distance Relationship": ["Could you handle a long-distance relationship?","What's the biggest challenge of LDR?","Do you know anyone who made LDR work?","Can phones sustain a relationship?","Is long-distance worth the effort?"],
+  "Views on Marriage": ["Do you want to get married?","What's the right age to marry?","Is buying a house necessary for marriage?","Have your parents pressured you to marry?","What would life be like if you never married?"],
+  "Wedding Imagination": ["What kind of wedding would you like?","Is a big wedding necessary?","Would you choose to elope / travel wedding?","What's the most memorable wedding you've attended?","Is it expected to return the gift money?"],
+  "Having Children": ["Do you want children?","How many children would be ideal?","Does raising kids scare you?","Would you have kids because you love them or because of tradition?","Have you considered being child-free?"],
+  "Parenting Views": ["Is it acceptable to spank children?","Do you support joyful parenting or strict discipline?","Should children take extracurricular lessons?","Would you let your child use a smartphone?","Should parents make decisions for their children?"],
+  "Living with Parents": ["Do you argue with your parents?","How often do you visit home?","Do your parents understand you?","Is there something you want to tell them but can't?","Should you live according to your parents' expectations?"],
+  "Siblings": ["Do you have siblings?","Is it better to have siblings or be an only child?","Are you close with your siblings?","Would you help your siblings when needed?","Do you think parents ever play favorites?"],
+  "Grandparents Memories": ["Did you live with your grandparents as a child?","What's something important your grandparents taught you?","Do you regret not spending more time with them?","Is the grandparent-grandchild bond special?","Do you call your grandparents often?"],
+  "Moving Memories": ["How many times have you moved?","Do you remember where you lived as a kid?","What do you miss most after moving?","Ever lost something important because of a move?","Do you have a clear sense of 'home'?"],
+  "Hometown Feelings": ["Where is your hometown?","How often do you go back?","Has your hometown changed a lot?","Have you ever thought about moving back?","Is hometown a place you can't return to?"],
+  "City Choice": ["Why did you stay in this city?","Which city would you like to live in?","Are big cities better or small towns?","Ever moved to a city for someone?","Are you used to the pace of your current city?"],
+  "Renting & Moving": ["What do you fear most when moving?","What's your top priority when house hunting?","Ever been forced out because of landlord issues?","Do you get along with your roommates?","Is living alone safe?"],
+  "Neighbor Relations": ["Do you know your neighbors?","Ever had a strange neighbor?","Would you complain about noisy neighbors?","Is having good neighbors important?","Do you greet your neighbors voluntarily?"],
+  "Public Transport": ["Do you take the subway or bus more often?","Ever miss your stop because of your phone?","What passenger behavior bothers you most?","Have you ever given up your seat for someone?","Should public transport be more civilized?"],
+  "Driving Experience": ["Do you have a driver's license?","Do you drive often?","Ever experienced road rage?","Is driving more tiring or being a passenger?","What kind of road do you enjoy most?"],
+  "Getting a License": ["How many tries did it take to pass your driving test?","Which part of the test was hardest?","Did your instructor ever yell at you?","How long did it take to get your license?","Should driving tests be stricter?"],
+  "Walking & Strolling": ["Do you enjoy walking?","Do you take a walk after meals?","Ever walked aimlessly for a long time?","Does walking help you think clearly?","What do you think about when walking alone?"],
+  "Rainy Mood": ["Do you like rainy days?","Does rain make you want to stay inside?","What's the best thing to do on a rainy day?","Ever run in the rain just for fun?","Does rain make you feel calm?"],
+  "Sunny Activities": ["What's your favorite sunny day activity?","Would you go out just because the weather is nice?","Ever taken a spontaneous trip because of sunshine?","Does sunshine lift your mood?","Would you choose bright sun or cloudy skies?"],
+  "Autumn & Winter": ["Do you prefer autumn or winter?","What's the hardest thing about winter?","Ever struggled to get up because it's too cold?","Do you like bundling up in warm clothes?","What's your favorite winter food?"],
+  "Spring & Summer": ["Do you prefer spring or summer?","Does summer heat bother you?","What do you love most about summer?","Does spring make you feel sleepy?","Do you have allergies when seasons change?"],
+  "New Year Resolutions": ["Do you make New Year's resolutions every year?","Did you accomplish last year's resolutions?","Are New Year's resolutions useful?","What's one thing you really want to do this year?","Ever stuck to a resolution for a long time?"],
+  "Cafes & Drink Shops": ["Do you like going to cafes?","Do you choose coffee by name or by taste?","Is there a cafe whose atmosphere you love?","Are cafes better for work or chatting?","Is it weird to go to a coffee shop alone?"],
+  "Online Shopping & Packages": ["How many packages do you receive per month on average?","Does opening packages instantly improve your mood?","Do you buy extra things just for free shipping?","Why do some people leave packages unopened?","Which is more addictive: online or physical shopping?"]
+};
+
+// ======================= 3. 土耳其语词库（完整） =======================
+const TR_POOL = {
+  "Hafta Sonu Planları": ["Hafta sonu genellikle saat kaça kadar uyursun?","Son zamanlarda iyi bir dizi izliyor musun?","Yağmurlu bir hafta sonunda ne yapmaktan hoşlanırsın?","Yalnız geçen hafta sonu sıkıcı bulur musun?","Hafta sonu dışarı çıkmayı mı yoksa evde kalmayı mı tercih edersin?"],
+  "Gidiş Geliş Yolu": ["Her gün yolda ne kadar zaman harcıyorsun?","Yolda müzik mi dinlersin yoksa podcast mi?","Yolda hiç ilginç bir şeyle karşılaştın mı?","Sence gidiş geliş nasıl daha az yorucu olabilir?","Yolda bir şey öğrenebilseydin ne öğrenmek isterdin?"],
+  "Paket Servis ve Yemek Yapmak": ["Haftada kaç kere paket servis sipariş edersin?","En iyi yaptığın yemek nedir?","Hiç yemek yapmaya üşendiğin oluyor mu?","Gerçekten güzel bir yemek için uzun sıra bekler misin?","Hangisi daha huzurlu: paket servis mi ev yemeği mi?"],
+  "Gece Kuşluğu": ["Normalde saat kaçta yatarsın?","En son ne zaman gece geç saatlere kadar kaldın, neden?","Geç kalmanın ertesi günü nasıl telafi edersin?","Erken yatıp erken kalkmak geç saatlere kalmaktan daha mı iyi?","Telefonu erken bırakmak için bir yöntemin var mı?"],
+  "Telefon Bağımlılığı": ["Günde yaklaşık ne kadar telefona bakıyorsun?","Telefonunu evde unutursan endişelenir misin?","En çok hangi uygulamada vakit geçiriyorsun?","Telefon süreni bilerek azaltmayı denedin mi?","Kısa videolar zaman kaybı mı yoksa dinlenme mi?"],
+  "Alışveriş Alışkanlıkları": ["Fiziksel mağazaları mı yoksa internet alışverişini mi tercih edersin?","Aldıktan hemen sonra pişman olduğun bir şey oldu mu?","İndirim diye ihtiyacın olmayan şeyler alır mısın?","Hangi tür şeylere daha fazla para vermeye değer bulursun?","En son aldığın ve çok memnun kaldığın şey neydi?"],
+  "Evcil Hayvan ve Arkadaşlık": ["Hiç evcil hayvanın oldu mu?","En çok hangi evcil hayvana sahip olmak isterdin?","Evcil hayvanlar yalnızlığı hafifletir mi?","Evcil hayvan bakımının zahmetli olduğunu düşündüğün oluyor mu?","Evcil hayvan sana ne öğretti?"],
+  "Arkadaşlık İlişkileri": ["En iyi arkadaşınla ne sıklıkla görüşürsün?","Arkadaşın senden borç isterse ne yapardın?","Arkadaşların sürekli iletişim halinde olması gerekir mi?","Küçük bir şey yüzünden küsüp barıştığın oldu mu?","Kesinlikle arkadaş olmayacağın insan tipi nedir?"],
+  "Aile Bağları": ["Aileni ne sıklıkla ararsın?","Ailenle yaşamak özgürlüğünü kısıtlıyor mu?","Ailende seni en iyi anlayan kim?","Ailene söylediğin ve pişman olduğun bir söz oldu mu?","Ailen seni koşulsuz desteklemeli mi?"],
+  "İş Yerinde Yeni Başlayan": ["İlk işini nasıl buldun?","Yeni başladığında utanç verici bir hata yaptın mı?","Yeni birinin en çok nelere dikkat etmesi gerekir?","Kıdemli çalışanlar tarafından hiç haksızlığa uğradın mı?","İş yerinde fazla iş yapan kişi olmayı kabul eder misin?"],
+  "İş Stresi": ["Son zamanlarda işten dolayı yorgun hissediyor musun?","Stresliyken nasıl rahatlıyorsun?","Hiç 'bırakıp gitsem mi' diye düşündün mü?","Fazla mesai zorunlu bir şey mi yoksa kaçınılmaz mı?","Sana başarı hissi veren iş nasıl olmalı?"],
+  "Patron ve Yönetim": ["Şimdiye kadarki en iyi patronun nasıldı?","Patronunla fikir ayrılığına düştüğünde ne yaparsın?","Sert mi yoksa soğuk bir patron mu daha zor?","Patron çalışanlarla samimi olmalı mı?","Patronun söylediği ve seni duygulandıran bir şey oldu mu?"],
+  "İş Arkadaşları": ["İş arkadaşlarınla iş dışında vakit geçirir misin?","Bir iş arkadaşın başkasının dedikodusunu yaparsa nasıl karşılarsın?","İş yerinde gerçek arkadaşlık kurulabilir mi?","Hiç iş arkadaşlarının arkasından konuştuğuna şahit oldun mu?","Eski iş arkadaşlarınla görüşmeye devam eder misin?"],
+  "Mülakat Deneyimleri": ["En unutulmaz iş mülakatın nasıldı?","Mülakatta bilmediğin bir soru gelirse ne yaparsın?","Mülakat daha çok yeteneğe mi bakar yoksa uyuma mı?","Heyecandan yanlış bir şey söylediğin oldu mu?","Şu anki işe alım süreçlerini beğeniyor musun?"],
+  "Para ve Maaş": ["İlk maaşını nasıl harcadın?","Sence ne kadar para 'yeterli' olur?","Daha fazla maaş için sevmediğin bir işi kabul eder miydin?","Para biriktirme alışkanlığın var mı?","Para mutluluk satın alır mı?"],
+  "Ev Tutma Hikayeleri": ["Kaç kere ev taşıdın / kiraladın?","Karşılaştığın en tuhaf ev sahibi nasıldı?","Oda arkadaşıyla yaşamak mı yoksa yalnız yaşamak mı?","Taşınmak en sıkıcı işlerden biri mi?","Ev tutarken olmazsa olmazların neler?"],
+  "Ev Satın Alma Düşüncesi": ["Hangi şehirde ev almak isterdin?","Gençler mutlaka ev almalı mı?","Fiyatlar düşse hemen alır mıydın?","Ev alma düşüncesi seni endişelendiriyor mu?","Hayat boyu kiracı olmayı kabul edebilir misin?"],
+  "Seyahat Planları": ["Bir sonraki gitmek istediğin yer neresi?","Her şeyi planlar mısın yoksa anlık mı gidersin?","Hiç seyahatte çok yorulduğun için keyif alamadığın oldu mu?","Seyahat ederken yemek mi manzara mı daha önemli?","Seyahat arkadaşınla yolda tartıştığın oldu mu?"],
+  "Yalnız Seyahat": ["Hiç yalnız seyahat ettin mi?","Yalnız seyahatin en iyi yanı nedir?","Yalnız gezerken yalnızlık hisseder misin?","Yabancılarla yol arkadaşı olup devam eder misin?","Yalnız seyahat etmeyi düşünenlere tek bir tavsiye ver."],
+  "Para Tasarrufu": ["Sence nasıl etkili tasarruf edilir?","Tasarruf etmek için değişik bir şey yaptın mı?","Harcamaları takip etmek işe yarar mı?","Tasarruf mu yoksa zamandan tasarruf mu daha önemli?","Daha ucuz bir alternatif alıp beğendiğin oldu mu?"],
+  "Finansal Zihniyet": ["Hiç fon ya da hisse senedi aldın mı?","Para kaybedince moralini nasıl düzeltirsin?","Mali okuryazarlık öğrenilmesi gereken bir beceri mi?","Paranı bankada tutar mısın yoksa yatırım yapar mısın?","Başkasının tavsiyesiyle para kaybettiğin oldu mu?"],
+  "Doğum Günü Gelenekleri": ["Doğum gününde pasta yer misin?","Hiç unutamadığın bir doğum günü yaşadın mı?","Doğum gününü yalnız geçirir miydin?","Doğum gününde hediye mi yoksa sevdiklerinle vakit geçirmek mi daha önemli?","Doğum günü kutlamak şart mı yoksa sade bir gün mü olmalı?"],
+  "Bayram Havası": ["En sevdiğin bayram hangisi?","Sence yılbaşı / bayramlar eski tadında mı?","Bayramların yorucu olduğunu düşündüğün oluyor mu?","Hiç kutlamak istemediğin bir bayram var mı?","Bayramlarda ailenle birlikte olmak en önemli şey mi?"],
+  "Hediye Seçimi": ["Hediye seçme konusunda iyi olduğunu düşünüyor musun?","Aldığın en garip hediye neydi?","Hediye verirken işlevsellik mi yoksa duygu mu önemli?","Hediye seçmek seni kaygılandırıyor mu?","Hediye olarak ne istediğini sormak doğru mu?"],
+  "Sosyal Ortamlar": ["Partilerde sessiz biri misin yoksa konuşkan mı?","Hiç sosyal ortamda çok garip hissettiğin oldu mu?","Kadeh kaldırmak zorunlu bir şey mi?","Uyum sağlamak için sevmediğin şeyler yapar mısın?","Düğünlerde en sıkıcı kısım nedir?"],
+  "Yalnız Zamanlar": ["Yalnız kalmaktan hoşlanır mısın?","Yalnızken neler yaparsın?","Çok yalnız kalınca sıkılır mısın?","Yalnızlık ve yalnız hissetmek aynı şey mi?","En son yalnız yaptığın ve çok keyif aldığın şey neydi?"],
+  "Geçmişe Bakış": ["İlkokuldaki en iyi arkadaşını hatırlıyor musun?","Zamanda geri gidebilsen hangi ana dönmek isterdin?","Verip pişman olduğun bir kararın var mı?","Çocukluk hayallerini hatırlıyor musun?","Sence çocukluk mu daha mutluydu yoksa şimdi mi?"],
+  "Kaygı Anları": ["Son zamanlarda seni kaygılandıran bir şey oldu mu?","Kaygılandığında kime sıçrarsın?","Spor kaygıyı azaltır mı?","Seni anında sakinleştiren bir şarkı var mı?","Kendi yaşıtlarından daha mı kaygılısın?"],
+  "Mutluluk Kaynakları": ["Seni anında mutlu eden şey nedir?","Mutluluk ve para bağlantılı mı?","Her gün güler misin?","En son neye yüksek sesle güldün?","Mutluluğu paylaşmak onu iki katına çıkarır mı?"],
+  "Kendini Değiştirmek": ["Kurtulmak istediğin kötü alışkanlığın nedir?","Kendini başarıyla değiştirdiğin bir alan oldu mu?","Kişilik tamamen değişebilir mi?","Başkalarının senden değiştirmeni istediği şey nedir?","Nasıl biri olmak istiyorsun?"],
+  "Erteleme Alışkanlığı": ["Bir şeyi son ana kadar ertelediğin oldu mu?","Erteleme tembellikten mi yoksa başaramama korkusundan mı?","Ertelemeyi durduran bir yöntem biliyor musun?","Son teslimat tarihinden bir gece önce çalışır mısın?","Erteledikten sonra kendini suçlar mısın?"],
+  "Sabah Uyanma Zorluğu": ["Sabah alarmın kaçıncı seferinde kalkarsın?","Geç kaldığın için sorun yaşadığın oldu mu?","Erken kalkmak hayatını değiştirir mi sence?","Gece kuşu musun yoksa sabah insanı mı?","Seni isteyerek erken kalkmaya itecek şey ne olabilir?"],
+  "Spor ve Egzersiz": ["Düzenli spor yapar mısın?","Spor salonuna üye olup gitmediğin oldu mu?","Yalnız spor mu yoksa arkadaşla mı daha iyi?","Özellikle sevdiğin bir spor var mı?","Spor yapmak ruh halini düzeltir mi?"],
+  "Yeme Alışkanlıkları": ["Seçici bir yiyici misin?","Kesinlikle yiyemediğin bir yiyecek var mı?","Hızlı mı yoksa yavaş mı yersin?","Sağlıklı ama sevmediğin bir şeyi yemek için zorlanır mısın?","Üç öğün düzenli olmalı mı?"],
+  "Cilt Bakımı": ["Cilt bakımına günde ne kadar vakit ayırırsın?","Geç kalmaktan dolayı sivilce çıkardığın oldu mu?","Kullandığın en pahalı cilt bakım ürünü neydi?","Cilt bakımı gereksiz bir masraf mı?","Cildini güzelleştiren bir sırrın var mı?"],
+  "Giyim Tarzı": ["Günlük giyim tarzın nasıl?","Bir ortama göre özel olarak giyinir misin?","Gardırobunda en çok hangi tür kıyafet var?","Pahalı alıp az giydiğin bir şey oldu mu?","Sence ne giydiğinde en iyi görünüyorsun?"],
+  "Saç Hikayeleri": ["Yaptırdığın en uç saç modeli neydi?","Saçını kestirdikten hemen sonra pişman olduğun oldu mu?","Ne sıklıkta saç kestirirsin?","Saç modeli görünüşte büyük fark yaratır mı?","Kendi saçını keser misin?"],
+  "Fotoğraf ve Düzenleme": ["Telefonunda çok fazla fotoğraf var mı?","Fotoğraflarını düzenler misin?","Sosyal medya için kareyi yakalamak için çok çekim yapar mısın?","Fotoğrafta gerçekteki gibi çıkmadığını düşünür müsün?","Orijinal mi yoksa düzenlenmiş fotoğraf mı daha iyi?"],
+  "Kısa Video Akışı": ["Günde ne kadar kısa video izlersin?","Hiç 'iki saat nasıl geçti' dediğin oldu mu?","Kısa videolar seni daha mutlu mu yoksa daha boş mu hissettiriyor?","Kısa videolardan yeni bir şey öğrendiğin oldu mu?","Kısa video uygulamalarını silmeli miyiz?"],
+  "Oyun Bağımlılığı": ["Online oyun oynar mısın?","Sabaha kadar oyun oynadığın oldu mu?","Oyunlar dinlenme mi yoksa kaçış mı?","Oyuna para harcamak değer mi?","Oyun içinde yabancılarla sohbet eder misin?"],
+  "Kitap Okuma Alışkanlığı": ["Yılda yaklaşık kaç kitap okursun?","Bitirdiğin son kitap hangisiydi?","Basılı kitap mı yoksa e-kitap mı?","Fikrini değiştiren bir kitap oldu mu?","Kitap okumak bilgi için mi yoksa dinlenmek için mi?"],
+  "Dizi İzleme Tutkusu": ["Şu anda hangi diziyi izliyorsun?","Gece geç saatlere kadar dizi izlediğin için yorgun olduğun oldu mu?","Bir diziyi defalarca tekrar izler misin?","Sence dizilerin kalitesi düştü mü?","Dizileri hızlı geçerek mi yoksa normal hızda mı izlersin?"],
+  "Film Zevki": ["En sevdiğin film türü nedir?","Defalarca izlediğin bir film var mı?","Sinemaya yalnız gider misin?","İyi bir filmi iyi yapan şey nedir?","Seni ağlatan bir film oldu mu?"],
+  "Müzik Tercihleri": ["En sevdiğin şarkıcı veya grup?","Sürekli döngüde dinlediğin bir şarkı var mı?","Sözleri bir şarkıyı daha çok sevdirir mi?","Araba kullanırken ya da yürürken mırıldanır mısın?","İlk aldığın albümü hatırlıyor musun?"],
+  "Konser Deneyimleri": ["Kimin konserine gittin?","Bilet bulamayınca çok üzüldüğün oldu mu?","Konserler o kadar paraya değer mi?","Sevdiğin biriyle konsere gitmek nasıl bir his?","Konserde ağladığın oldu mu?"],
+  "Hobiler": ["Son zamanlarda edindiğin yeni bir hobi var mı?","Üç yıldan uzun süredir devam ettirdiğin bir hobi?","Hobiler para kazandırmalı mı yoksa sadece eğlence mi?","Hobi sayesinde yeni arkadaşlar edindin mi?","Asla bırakmayacağın bir hobi ne olurdu?"],
+  "El İşi ve DIY": ["El işi yapmayı sever misin?","Kendi yaptığın küçük bir şey var mı?","DIY hazır almaktan daha mı anlamlı?","Hünerli misin yoksa acemi misin?","Hediye olarak el yapımı bir şey verdin mi?"],
+  "Yeni Şeyler Öğrenmek": ["Son zamanlarda hangi yeni beceriyi öğreniyorsun?","Yarıda bıraktığın bir şey oldu mu?","Yetişkinlerin yeni şeyler öğrenmesi daha mı zor?","Kendi kendine başardığın bir şey var mı?","Öğrenmek isteyip de başlamadığın şey nedir?"],
+  "Dil Öğrenimi": ["Kaç dil konuşuyorsun?","Bir dil öğrenip unuttuğun oldu mu?","Dil öğrenmek yetenek mi yoksa çaba mı?","Dizileri altyazısız izlemeye çalışır mısın?","Hiç yabancı biriyle sohbet ettin mi?"],
+  "Topluluk Önünde Konuşma": ["Sahneye çıkınca heyecanlanır mısın?","Kalabalık önünde konuştuğun oldu mu?","Heyecanı yenmek için en iyi yol nedir?","Konuşma sırasında sözünü unuttuğun oldu mu?","İş yerinde söz alan kişi olmayı ister misin?"],
+  "Toplantı Deneyimi": ["Toplantıların çoğu zaman kaybı mı?","Toplantıda gizlice başka bir şeyle ilgilendin mi?","Toplantılarda aktif konuşur musun?","Toplantılar ayakta yapılmalı mı oturarak mı?","Çok sıkıcı bir toplantıya katıldığın oldu mu?"],
+  "E-posta Görgü Kuralları": ["Günde kaç iş e-postası alıyorsun?","E-postaları yanıtlamayı erteler misin?","E-postalar kısa mı yoksa detaylı mı olmalı?","Yanlış kişiye e-posta gönderdiğin oldu mu?","Mesai dışında iş e-postalarına bakar mısın?"],
+  "İşten Ayrılma Deneyimi": ["Hiç işten ayrıldın mı?","Ayrılma nedenin neydi?","Hiç başka iş bulmadan istifa ettin mi? Pişman mısın?","Yeni iş bulmadan ayrılmamak daha mı iyi?","Patronuna ayrılırken ne söylemiştin?"],
+  "Kariyer Tercihleri": ["Bu alanı neden seçtin?","Hiç sektör değiştirmeyi düşündün mü?","İş seçerken maaş mı yoksa ilgi mi daha önemli?","Kariyerinle ilgili en büyük sorunun ne?","On yıl sonra kendini nerede görüyorsun?"],
+  "Yan Gelir Fikirleri": ["Yan gelirin var mı?","Nasıl bir yan iş yapmak isterdin?","Yan iş ana işini etkiler mi?","Yan işi ilgi için mi yoksa para için mi yaparsın?","Yan iş ana işin haline gelebilir mi?"],
+  "Girişimcilik Ateşi": ["Kendi işini kurmayı hiç düşündün mü?","Girişimciliğin en büyük riski nedir?","Çevrende girişimcilikte başarılı olan biri var mı?","Sana para verilse ne tür bir dükkan açardın?","Çalışan olmak mı yoksa patron olmak mı daha yorucu?"],
+  "İlk Kazanç": ["İlk ne zaman para kazandın?","İlk gelirini nasıl elde ettin?","İlk kazancını neye harcadın?","Gençler daha çok kazanmaya mı odaklanmalı yoksa öğrenmeye mi?","Daha fazla kazanmayı düşündüğün oluyor mu?"],
+  "Harcama Şekli": ["Son zamanlarda mutluluğunu artıran bir şey aldın mı?","Neye daha fazla para vermeye değer?","Pahalı alıp 'hakkını verdi' dediğin bir şey oldu mu?","Tüketimi azaltmak sence mümkün mü?","Hizmet kalitesi için para harcamaya razı mısın?"],
+  "Gereksiz Eşyalardan Kurtulma": ["Hiç eşyalarını ayıklama dönemi yaşadın mı?","Evin çok eşyalı olması ruh halini etkiler mi?","Atamayıp da kullanmadığın şeyler var mı?","Bir şey atmak seni hafif mi yoksa suçlu mu hissettiriyor?","Sadelik mutluluk getirir mi?"],
+  "Mutfak Felaketleri": ["Yemek yaparken facia yaşadığın oldu mu?","En kötü mutfak kazan nedir?","İlk yemek yapmaya başladığında kaç yaşındaydın?","Yemek yeteneğin olduğunu düşünüyor musun?","Yemek yaparken sezgilerine mi yoksa tarife mi güvenirsin?"],
+  "Tatlı Tutkunu": ["Tatlı sever misin?","Kötü hissettiğinde tatlı yemek iyi gelir mi?","Hiç bıkıp usanmadığın bir tatlı var mı?","Kendi pastanı ya da kurabiyeni yapmayı denedin mi?","Bubble tea mutluluk içeceği mi yoksa kalori bombası mı?"],
+  "Kahve Alışkanlığı": ["Her gün kahve içer misin?","Kahvesiz uyanabilir misin?","Amerikano mu yoksa latte mi tercih edersin?","Güzel kahve için özel bir kafeye gider misin?","Çok kahve içip uyuyamadığın oldu mu?"],
+  "İçki Kültürü": ["Alkol içebilir misin?","İçki teklifini reddetmek kabul edilebilir mi?","Hiç sarhoş oldun mu? Nasıl bir histi?","İçmeyenler partide dışlanır mı?","İçmemek için hasta numarası yaptığın oldu mu?"],
+  "Çocukluk Atıştırmalıkları": ["Çocukken en sevdiğin atıştırmalık neydi?","O çocukluk atıştırmalıklarını hala bulabiliyor musun?","Kart biriktirmek için defalarca cips aldığın oldu mu?","Eskiden yiyecekler daha mı güzeldi şimdi mi?","Hala cips çeşitlerinden yiyor musun?"],
+  "Paket Servis Sürprizleri": ["Hiç çok kötü bir paket servis deneyimin oldu mu?","Sipariş vermeden önce kötü yorumları okur musun?","Fotoğrafa aldanıp hayal kırıklığı yaşadığın oldu mu?","Paket serviste en dayanamadığın sorun ne?","Güzel paketleme için iyi puan verir misin?"],
+  "Restoran Kuyruğu": ["Güzel yemek için ne kadar kuyruk beklerdin?","Uzun bekleyip değmediğini düşündüğün oldu mu?","Sıra beklememek için gitmekten vazgeçtiğin oluyor mu?","Popüler restoranlar denenmeye değer mi?","Yemek için uzun yol gittiğin oldu mu?"],
+  "Sağlık Kaygısı": ["Sağlığının iyi olduğunu düşünüyor musun?","Geç saatlere kalmak sağlığında sorun yarattı mı?","En son ne zaman check-up yaptırdın?","Sağlık yazıları seni kaygılandırıyor mu?","Gençken vücudu zorlamak sorun değil mi?"],
+  "Uyku Kalitesi": ["Uyku kaliten nasıl son zamanlarda?","Rüya görür müsün? Hatırlar mısın?","Hiç uykusuzluk çektin mi? Ne düşünürsün?","Yatmadan telefona bakmak uykuyu etkiler mi?","Daha iyi uyumak için bir yöntemin var mı?"],
+  "Hastalık Deneyimi": ["En son ne zaman hastalandın?","Hastayken kendi başına dayanır mısın yoksa doktora gider misin?","Hastayken en çok neye ihtiyacın olur?","Küçük bir hastalığı önemseyip büyüttüğün oldu mu?","İğneden korkar mısın?"],
+  "Genler ve Görünüm": ["Ailede kime benziyorsun?","Ailen 'şu yönün bana benziyor' der mi?","Birinin görünüşünü özendiğin oluyor mu?","Görünüş mü yoksa karakter mi daha önemli?","Estetik yaptırmayı düşündün mü?"],
+  "Boy ve Kilo": ["Boyundan memnun musun?","Hiç kilo endişen oldu mu?","Kilo vermek için yaptığın en uç şey neydi?","Zayıf olmak daha mı güzel gösterir?","Partnerinin boyu senin için önemli mi?"],
+  "Giyim Özgürlüğü": ["Ne giydiğine karar vermekte özgür hissetmek önemli mi?","Başkalarının bakışı yüzünden bir kıyafeti giymekten vazgeçtin mi?","İş yerinde kıyafetine dikkat eder misin?","Çok dikkat çekici bir kıyafetle dışarı çıkabilir misin?","Her ortama göre giyinmeli mi?"],
+  "Makyajla Çıkmak": ["Dışarı çıkarken makyaj yapar mısın?","Makyajsız çıkmak sana baskı yapar mı?","Makyaj yapmak en hızlı ne kadar sürer?","Makyaj yüzünden geç kaldığın oldu mu?","Makyaj kendin için mi başkaları için mi?"],
+  "Erkek Cilt Bakımı": ["Erkekler cilt bakımı yapmalı mı?","Çevrende cilt bakımı yapan erkekler var mı?","Erkeklerin makyaj yapması sence kabul edilebilir mi?","Erkeklerin cilt bakım ürünü kullanması garip mi?","Sevgiline cilt bakım ürünü alır mısın?"],
+  "Çift Tartışmaları": ["Partnerinle en uzun süren tartışman ne kadardı?","Tartışmadan sonra ilk adımı sen atar mısın?","Sessizlik sorunları çözer mi?","Küçük bir şey büyüyüp kavgaya dönüştü mü?","Tartışmaların iyi tarafı var mı?"],
+  "Kör Randevu": ["Hiç kör randevuya çıktın mı?","Karşılaştığın en garip kör randevu nasıldı?","Kör randevudan gerçek aşk çıkar mı?","Aile baskısıyla kör randevuya gider misin?","İlk kör randevuda ne konuşulur?"],
+  "Uzaktan İlişki": ["Uzaktan ilişkiyi kaldırabilir misin?","Uzaktan ilişkinin en büyük zorluğu nedir?","Uzaktan ilişkiyi başaran bir arkadaşın var mı?","Telefon ilişkiyi ayakta tutar mı?","Uzaktan ilişki çekilmeye değer mi?"],
+  "Evlilik Görüşleri": ["Evlenmek istiyor musun?","Sence evlenmek için ideal yaş kaçtır?","Evlenmek için ev almak şart mı?","Ailen seni evlenmen için hiç sıkıştırdı mı?","Hiç evlenmezsen hayatın nasıl olurdu?"],
+  "Düğün Hayalleri": ["Nasıl bir düğün isterdin?","Büyük düğün yapmak şart mı?","Seyahat düğününü tercih eder miydin?","Katıldığın en unutulmaz düğün hangisiydi?","Takı parasının iade edilmesi gerekir mi?"],
+  "Çocuk Sahibi Olma": ["Çocuk ister misin?","Kaç çocuk ideal?","Çocuk bakmak korkutuyor mu?","Çocuk sahibi olmayı sevdiğin için mi yoksa gelenek olduğu için mi istersin?","Çocuksuz yaşamayı düşündün mü?"],
+  "Ebeveynlik Görüşleri": ["Çocuğa şiddet uygulamak kabul edilebilir mi?","Mutlu ebeveynlik mi yoksa disiplinli ebeveynlik mi?","Çocuklar yetenek kurslarına gitmeli mi?","Çocuğun telefon kullanmasına izin verir misin?","Ebeveynler çocuklarının kararlarını vermeli mi?"],
+  "Aile ile Yaşamak": ["Ailenle tartışır mısın?","Eve ne sıklıkta gidersin?","Ailen seni anlıyor mu?","Ailene söyleyip de söyleyemediğin bir şey var mı?","Ailenin beklentilerine göre mi yaşamalısın?"],
+  "Kardeşler": ["Kardeşin var mı?","Kardeşli mi büyümek iyi yoksa tek çocuk mu?","Kardeşlerinle aran iyi mi?","Kardeşine yardım eder misin?","Ailenin birini daha çok kayırdığını hissettiğin oldu mu?"],
+  "Büyükbaba/Büyükanne Anıları": ["Çocukken büyüklerinle birlikte yaşadın mı?","Büyüklerinin sana öğrettiği en önemli şey neydi?","Onlarla daha çok vakit geçirmemeye pişman mısın?","Torun-sevgi bağı gerçekten özel mi?","Büyüklerini arar mısın?"],
+  "Taşınma Anıları": ["Kaç kere taşındın?","Çocukken oturduğun yeri hatırlıyor musun?","Taşınırken en çok neyi özlersin?","Taşınma yüzünden önemli bir şey kaybettiğin oldu mu?","Ev hissine sahip misin?"],
+  "Memleket Hasreti": ["Memleketin neresi?","Ne sıklıkla memleketine gidersin?","Memleketin çok değişti mi?","Memleketine dönmeyi düşündün mü?","Memleket hasreti geri dönülemeyen bir yer mi?"],
+  "Şehir Seçimi": ["Bu şehirde neden yaşıyorsun?","Yaşamak istediğin şehir hangisi?","Büyük şehir mi küçük şehir mi daha iyi?","Birinin peşinden gidip şehir değiştirdiğin oldu mu?","Yaşadığın şehrin temposuna alıştın mı?"],
+  "Kiracı Olmak & Taşınmak": ["Taşınırken en çok neyden korkarsın?","Ev ararken en önemli kriterin nedir?","Ev sahibi yüzünden evden çıkarıldığın oldu mu?","Ev arkadaşlarınla iyi anlaşır mısın?","Yalnız yaşamak güvenli mi?"],
+  "Komşuluk İlişkileri": ["Komşularını tanıyor musun?","Hiç garip bir komşun oldu mu?","Gürültü yapan komşudan şikayet eder misin?","İyi komşuluk önemli mi?","Komşularına kendin selam verir misin?"],
+  "Toplu Taşıma": ["Daha çok metro mu yoksa otobüs mü kullanırsın?","Telefonla oynarken durak kaçırdığın oldu mu?","Toplu taşımada en çok hangi davranış rahatsız eder?","Birine yer verdiğin oldu mu?","Toplu taşıma daha medeni olmalı mı?"],
+  "Araba Kullanma Deneyimi": ["Ehliyetin var mı?","Sık sık araba kullanır mısın?","Hiç yol öfkesi yaşadın mı?","Araba kullanmak mı daha yorucu yolcu olmak mı?","En çok hangi yollarda sürmekten hoşlanırsın?"],
+  "Ehliyet Alma Süreci": ["Ehliyet sınavını kaçıncı denemede geçtin?","En zor kısım hangisiydi?","Eğitmen seni hiç azarladı mı?","Ehliyet alman ne kadar sürdü?","Ehliyet sınavları daha zor olmalı mı?"],
+  "Yürüyüş": ["Yürümeyi sever misin?","Yemekten sonra yürüyüş yapar mısın?","Hiç hedefsizce uzun süre yürüdün mü?","Yürümek düşünceleri düzene sokar mı?","Yalnız yürürken ne düşünürsün?"],
+  "Yağmurlu Hava Modu": ["Yağmurlu havayı sever misin?","Yağmurlu havada dışarı çıkmak istemez misin?","Yağmurlu günde ne yapmak iyi gelir?","Hiç yağmurda koştun mu?","Yağmur sana sakinlik verir mi?"],
+  "Güneşli Gün Aktiviteleri": ["Güneşli bir günde en sevdiğin aktivite?","Hava güzel diye özellikle dışarı çıkar mısın?","Hava güzel diye anlık bir gezi yaptığın oldu mu?","Güneşli hava moralini yükseltir mi?","Güneşli mi yoksa bulutlu havayı mı tercih edersin?"],
+  "Sonbahar ve Kış": ["Sonbaharı mı yoksa kışı mı daha çok seversin?","Kışın en zor yanı nedir?","Soğuktan yataktan çıkamadığın oldu mu?","Kalın giysilere sarılmayı sever misin?","Kışın en sevdiğin yiyecek nedir?"],
+  "İlkbahar ve Yaz": ["İlkbaharı mı yazı mı tercih edersin?","Yaz sıcağı seni rahatsız eder mi?","Yazın en sevdiğin şey nedir?","İlkbaharda uykun gelir mi?","Mevsim geçişlerinde alerjin olur mu?"],
+  "Yeni Yıl Kararları": ["Her yıl yeni yıl kararları alır mısın?","Geçen yılki kararlarını tutturabildin mi?","Yeni yıl kararları işe yarar mı?","Bu yıl yapmak istediğin en önemli şey ne?","Hiç uzun süre takip ettiğin bir kararın oldu mu?"],
+  "Kafeler ve İçecek Dükkanları": ["Kafelere gitmeyi sever misin?","Kahve seçerken isme göre mi yoksa tada göre mi karar verirsin?","Ortamını özellikle sevdiğin bir kafe var mı?","Kafeler çalışmak için mi yoksa sohbet için mi daha uygun?","Yalnız kafeye gitmek garip karşılanır mı?"],
+  "Online Alışveriş ve Kargolar": ["Ayda ortalama kaç kargo alırsın?","Kargo kolisi açmak moralini düzeltir mi?","Kargo ücretsiz olsun diye ihtiyacın olmayan şeyler alır mısın?","Bazı insanlar kolileri neden açmaz?","Online alışveriş mi yoksa fiziksel alışveriş mi daha bağımlılık yapıcı?"]
+};
+
+// ======================= 4. 印尼语词库（完整） =======================
+const ID_POOL = {
+  "Akhir Pekan": ["Kamu biasanya bangun jam berapa saat akhir pekan?","Akhir-akhir ini nonton serial apa yang bagus?","Hujan di akhir pekan, kamu suka melakukan apa?","Apa akhir pekan terasa membosankan jika sendirian?","Kamu lebih suka pergi keluar atau di rumah saja saat akhir pekan?"],
+  "Perjalanan Pulang Pergi": ["Berapa lama waktu perjalananmu setiap hari?","Di perjalanan suka dengar musik atau podcast?","Pernah menemukan hal menarik selama perjalanan?","Menurutmu bagaimana agar perjalanan tidak terlalu melelahkan?","Jika bisa belajar sesuatu selama perjalanan, mau belajar apa?"],
+  "Makanan Dipesan & Masak": ["Seminggu berapa kali kamu pesan makanan online?","Masakan andalanmu apa?","Pernah merasa terlalu malas untuk masak?","Relakan antri panjang demi makanan enak?","Mana yang lebih menenangkan: makanan pesan-antar atau masakan rumah?"],
+  "Begadang": ["Biasanya jam berapa kamu tidur?","Terakhir begadang karena apa?","Bagaimana caramu memulihkan diri setelah begadang?","Tidur awal lebih baik daripada begadang?","Ada tips untuk melepaskan HP lebih awal?"],
+  "Ketergantungan HP": ["Rata-rata berapa jam sehari lihat HP?","Cemas kalau lupa membawa HP?","Aplikasi apa yang paling banyak menyita waktumu?","Pernah coba kurangi waktu bermain HP?","Video pendek itu buang waktu atau relaksasi?"],
+  "Kebiasaan Belanja": ["Kamu lebih suka belanja online atau ke toko fisik?","Pernah beli sesuatu lalu menyesal?","Membeli barang tidak perlu karena diskon?","Barang apa yang rela kamu keluarkan uang lebih untuk kualitas?","Barang terakhir yang kamu beli dan sangat kamu sukai apa?"],
+  "Hewan Peliharaan": ["Pernah punya hewan peliharaan?","Hewan peliharaan apa yang paling ingin kamu punya?","Hewan peliharaan bisa mengurangi rasa kesepian?","Pernah merasa repot merawat hewan?","Apa yang hewan peliharaan ajarkan padamu?"],
+  "Pertemanan": ["Seberapa sering bertemu sahabatmu?","Jika teman minta pinjam uang, bagaimana sikapmu?","Apakah teman harus selalu berkomunikasi?","Pernah bertengkar karena hal kecil?","Orang seperti apa yang tidak akan pernah kamu jadikan teman?"],
+  "Hubungan Keluarga": ["Seberapa sering menelepon keluarga?","Tinggal bersama orang tua membuatmu merasa tidak bebas?","Siapa di keluarga yang paling memahami dirimu?","Pernah mengucapkan kata-kata menyakitkan pada keluarga?","Haruskah keluarga mendukungmu tanpa syarat?"],
+  "Pendatang Baru di Tempat Kerja": ["Bagaimana kamu mendapatkan pekerjaan pertama?","Pernah membuat kesalahan memalukan saat baru bekerja?","Menurutmu hal terpenting yang harus diperhatikan pendatang baru?","Pernah diperlakukan tidak adil oleh rekan senior?","Maukah kamu jadi orang yang mau bekerja ekstra?"],
+  "Tekanan Kerja": ["Akhir-akhir ini merasa lelah karena pekerjaan?","Bagaimana caranya melepas stres?","Pernah berpikir 'enaknya resign saja'?","Lembur itu pilihan atau keterpaksaan?","Pekerjaan seperti apa yang membuatmu merasa berprestasi?"],
+  "Atasan dan Pimpinan": ["Seperti apa atasan terbaik yang pernah kamu miliki?","Bagaimana menghadapi perbedaan pendapat dengan atasan?","Kamu lebih takut atasan yang keras atau yang cuek?","Haruskah atasan akrab dengan bawahan?","Pernah atasan mengatakan sesuatu yang menyentuh hatimu?"],
+  "Rekan Kerja": ["Apakah kamu bergaul dengan rekan kerja di luar jam kerja?","Saat rekan kerja bergosip, bagaimana reaksimu?","Bisa mendapat teman sejati di tempat kerja?","Pernah menjadi bahan gosip di kantor?","Apa kamu tetap berhubungan dengan mantan rekan kerja?"],
+  "Pengalaman Wawancara": ["Wawancara kerja paling berkesanmu?","Jika ditanya sesuatu yang tidak tahu, apa yang kamu lakukan?","Wawancara lebih menilai kemampuan atau chemistry?","Pernah grogi lalu salah bicara?","Apa yang membuatmu frustrasi dari proses rekrutmen saat ini?"],
+  "Uang dan Gaji": ["Bagaimana kamu menghabiskan gaji pertamamu?","Berapa banyak uang yang menurutmu 'cukup'?","Maukah kamu ambil pekerjaan membosankan demi gaji tinggi?","Apakah kamu punya kebiasaan menabung?","Apakah uang bisa membeli kebahagiaan?"],
+  "Cerita Sewa Rumah": ["Berapa kali kamu pindah kost / kontrak?","Seperti apa pemilik rumah paling aneh yang pernah kamu temui?","Mana yang lebih baik: berbagi atau tinggal sendiri?","Apakah pindahan adalah hal paling menyebalkan?","Apa syarat mutlakmu saat menyewa rumah?"],
+  "Membeli Rumah": ["Di kota mana kamu ingin membeli rumah?","Apakah anak muda wajib membeli rumah?","Jika harga turun, apakah kamu akan beli segera?","Pikiran membeli rumah pernah membuatmu cemas?","Bisakah kamu menerima tinggal di rumah sewa seumur hidup?"],
+  "Rencana Perjalanan": ["Destinasi impian selanjutnya ke mana?","Kamu perencana detail atau tipe mengalir?","Pernah terlalu lelah sehingga tak menikmati liburan?","Saat traveling, mana lebih penting: kuliner atau pemandangan?","Pernah bertengkar dengan teman perjalanan?"],
+  "Perjalanan Sendiri": ["Pernah bepergian sendirian?","Apa hal terbaik dari traveling solo?","Apakah traveling sendirian terasa sepi?","Maukah kamu bergabung dengan orang asing di perjalanan?","Beri satu saran untuk yang belum pernah traveling sendirian."],
+  "Tips Hemat": ["Menurutmu cara hemat yang efektif?","Pernah melakukan hal tidak biasa demi hemat?","Apakah mencatat pengeluaran berguna?","Mana yang lebih kamu utamakan: hemat uang atau hemat waktu?","Pernah beli produk pengganti murah dan ternyata bagus?"],
+  "Pola Pikir Finansial": ["Pernah membeli reksadana atau saham?","Bagaimana menjaga hati saat rugi?","Apakah literasi keuangan wajib dipelajari?","Kamu simpan uang di tabungan atau deposito?","Pernah rugi karena ikut-ikutan saran orang lain?"],
+  "Tradisi Ulang Tahun": ["Apakah kamu makan kue di hari ulang tahun?","Ada ulang tahun yang paling berkesan?","Apakah kamu akan merayakan ulang tahun sendirian?","Kamu lebih menghargai hadiah atau kebersamaan?","Ulang tahun harus dirayakan meriah atau biasa saja?"],
+  "Suasana Hari Raya": ["Hari raya favoritmu apa?","Apakah Lebaran / Tahun Baru masih terasa istimewa?","Pernah merasa hari raya malah melelahkan?","Ada hari raya yang tidak ingin kamu rayakan?","Apakah berkumpul keluarga adalah yang terpenting saat hari raya?"],
+  "Memilih Kado": ["Apa kamu jago memilih kado?","Kado paling aneh yang pernah kamu terima?","Saat memberi kado, kamu utamakan fungsi atau perasaan?","Memilih kado membuatmu cemas?","Apakah boleh bertanya langsung apa yang diinginkan?"],
+  "Situasi Sosial": ["Di pesta, kamu termasuk pendiam atau banyak bicara?","Pernah merasa sangat canggung dalam situasi sosial?","Apakah bersulang itu wajib?","Maukah kamu melakukan hal yang tidak suka demi diterima?","Bagian paling membosankan saat menghadiri pernikahan?"],
+  "Waktu Sendiri": ["Apakah kamu menikmati waktu sendiri?","Apa yang biasa kamu lakukan saat sendiri?","Apakah terlalu lama sendiri membuatmu suntuk?","Apakah sendiri itu sama dengan kesepian?","Ceritakan saat kamu melakukan sesuatu sendirian dan sangat menikmatinya."],
+  "Melihat ke Belakang": ["Masih ingat sahabat masa SD-mu?","Jika bisa kembali ke masa lalu, ingin kembali ke kapan?","Pernah menyesali keputusan yang kamu buat?","Masih ingat impian masa kecilmu?","Menurutmu masa kecil lebih bahagia atau sekarang?"],
+  "Saat Cemas": ["Akhir-akhir ini hal apa yang membuatmu cemas?","Kepada siapa kamu cerita saat cemas?","Apakah olahraga mengurangi kecemasan?","Ada lagu yang bisa langsung menenangkanmu?","Apakah kamu merasa lebih cemas dibanding teman sebayamu?"],
+  "Sumber Kebahagiaan": ["Hal apa yang bisa langsung membuatmu bahagia?","Apakah kebahagiaan dan uang berhubungan?","Apakah kamu tertawa setiap hari?","Apa yang terakhir kali membuatmu tertawa lepas?","Apakah berbagi kebahagiaan melipatgandakannya?"],
+  "Mengubah Diri": ["Kebiasaan buruk apa yang ingin kamu tinggalkan?","Pernah berhasil mengubah dirimu sendiri?","Bisakah kepribadian berubah total?","Apa kata orang yang paling perlu kamu ubah?","Menjadi pribadi seperti apa yang kamu inginkan?"],
+  "Kebiasaan Menunda": ["Pernah menunda-nunda sampai saat terakhir?","Apakah penundaan karena malas atau takut gagal?","Ada cara jitu untuk melawan penundaan?","Apakah kamu sering begadang karena kepepet deadline?","Setelah menunda, apakah kamu menyalahkan diri sendiri?"],
+  "Susah Bangun Pagi": ["Berapa kali alarm berbunyi sebelum kamu bangun?","Pernah terlambat karena susah bangun?","Apakah bangun pagi benar-benar mengubah hidup?","Kamu tipe burung malam atau burung pagi?","Apa yang bisa membuatmu rela bangun pagi?"],
+  "Olahraga": ["Apakah kamu rutin berolahraga?","Pernah bayar membership gym tapi tidak pernah dipakai?","Kamu suka olahraga sendiri atau bersama?","Ada olahraga yang benar-benar kamu nikmati?","Olahraga memperbaiki suasana hatimu?"],
+  "Kebiasaan Makan": ["Apakah kamu pilih-pilih makanan?","Makanan apa yang tidak bisa kamu toleransi?","Kamu makan cepat atau lambat?","Maukah kamu makan sesuatu yang sehat tapi tidak enak?","Haruskah tiga kali sehari teratur?"],
+  "Perawatan Kulit": ["Berapa waktu yang kamu habiskan untuk perawatan kulit setiap hari?","Pernah berjerawat karena begadang?","Produk perawatan kulit termahal yang pernah kamu pakai?","Apakah perawatan kulit hanya gimmick?","Apa tips rahasiamu untuk kulit lebih baik?"],
+  "Gaya Berpakaian": ["Seperti apa gaya berpakaianmu sehari-hari?","Apakah kamu berdandan khusus untuk acara tertentu?","Jenis pakaian apa yang paling banyak di lemari?","Pernah membeli mahal tapi jarang dipakai?","Kamu merasa paling cocok pakai baju seperti apa?"],
+  "Cerita Rambut": ["Model rambut paling ekstrem yang pernah kamu buat?","Pernah menyesal setelah potong rambut?","Seberapa sering potong rambut?","Apakah gaya rambut sangat mempengaruhi penampilan?","Apakah kamu berani potong rambut sendiri?"],
+  "Edit Foto": ["Apakah kamu punya banyak foto di HP?","Edit foto sebelum diunggah?","Mengambil banyak bidikan hanya untuk media sosial?","Apakah kamu merasa tidak fotogenik?","Mana yang lebih bagus: foto asli atau hasil editan?"],
+  "Scroll Video Pendek": ["Berapa lama kamu scrolling video pendek setiap hari?","Pernah kehilangan dua jam tanpa sadar?","Video pendek membuatmu lebih bahagia atau lebih hampa?","Pernah belajar keterampilan baru dari video pendek?","Apakah kita harus menghapus aplikasi video pendek?"],
+  "Kecanduan Game": ["Apakah kamu main game online?","Pernah begadang sampai pagi karena game?","Apakah game itu relaksasi atau pelarian?","Apakah menghabiskan uang untuk game itu sepadan?","Apakah kamu mengobrol dengan orang asing dalam game?"],
+  "Kebiasaan Membaca": ["Kira-kira berapa buku yang kamu baca setahun?","Buku terakhir yang selesai kamu baca?","Kamu lebih suka buku fisik atau ebook?","Pernah ada buku yang mengubah pandanganmu?","Apakah membaca untuk pengetahuan atau untuk bersantai?"],
+  "Menyelesaikan Serial": ["Serial apa yang sedang kamu tonton?","Pernah begadang karena keasyikan nonton serial?","Apakah kamu menonton ulang serial favorit berkali-kali?","Apakah serial sekarang semakin tidak menarik?","Apakah kamu tipe yang skip atau nonton normal?"],
+  "Selera Film": ["Genre film favoritmu apa?","Ada film yang sudah kamu tonton berkali-kali?","Apakah kamu pergi ke bioskop sendirian?","Apa yang membuat film menjadi bagus?","Pernah ada film yang membuatmu menangis?"],
+  "Preferensi Musik": ["Penyanyi atau grup favoritmu?","Ada lagu yang kamu putar berulang-ulang?","Apakah lirik membuatmu lebih suka lagu?","Apakah kamu bersenandung saat menyetir atau berjalan?","Masih ingat album pertama yang kamu beli?"],
+  "Pengalaman Konser": ["Konser siapa saja yang pernah kamu tonton?","Pernah kecewa karena gagal dapat tiket?","Apakah konser sebanding dengan uang yang dikeluarkan?","Bagaimana rasanya menonton konser dengan orang tersayang?","Pernah menangis di konser?"],
+  "Hobi": ["Akhir-akhir ini ada hobi baru?","Ada hobi yang sudah kamu jalani lebih dari tiga tahun?","Haruskah hobi mendatangkan uang atau sekadar bersenang-senang?","Pernah mendapat teman baru karena hobi?","Hobi apa yang tidak akan pernah kamu tinggalkan?"],
+  "DIY & Kerajinan Tangan": ["Apakah kamu suka membuat kerajinan tangan?","Pernah membuat sesuatu sendiri?","Apakah DIY lebih bermakna daripada membeli?","Apakah kamu terampil atau kikuk?","Pernah membuat hadiah buatan tangan untuk seseorang?"],
+  "Belajar Hal Baru": ["Keterampilan baru apa yang sedang kamu pelajari?","Pernah berhenti di tengah jalan saat belajar sesuatu?","Apakah orang dewasa lebih sulit belajar hal baru?","Pernah berhasil belajar sesuatu secara otodidak?","Apa yang ingin kamu pelajari tapi belum pernah kamu mulai?"],
+  "Belajar Bahasa": ["Berapa bahasa yang bisa kamu gunakan?","Pernah belajar bahasa asing lalu lupa?","Belajar bahasa lebih karena bakat atau usaha?","Apakah kamu berusaha nonton tanpa subtitle?","Pernah bercakap-cakap dengan orang asing?"],
+  "Berbicara di Depan Umum": ["Apakah kamu gugup saat berbicara di atas panggung?","Pernah berbicara di depan banyak orang?","Cara paling ampuh mengatasi demam panggung?","Pernah lupa kata-kata saat presentasi?","Apakah kamu relah menjadi orang yang angkat bicara di kantor?"],
+  "Pengalaman Rapat": ["Menurutmu, apakah kebanyakan rapat buang-buang waktu?","Pernah diam-diam melakukan hal lain saat rapat?","Apakah kamu aktif berbicara dalam rapat?","Haruskah rapat dilakukan sambil berdiri?","Pernah mengikuti rapat yang sangat membosankan?"],
+  "Etika Email": ["Berapa banyak email kerja yang kamu terima per hari?","Apakah kamu menunda membalas email?","Email harusnya singkat atau detail?","Pernah mengirim email ke orang yang salah?","Apakah kamu memeriksa email kerja setelah jam kantor?"],
+  "Pengalaman Resign": ["Pernah berhenti dari pekerjaan?","Apa alasanmu berhenti?","Pernah berhenti tanpa pekerjaan baru? Menyesal?","Apakah lebih baik cari kerja baru dulu baru resign?","Bagaimana kamu bilang ke atasan saat resign?"],
+  "Pilihan Karier": ["Mengapa kamu memilih bidang ini?","Pernah berpikir untuk pindah industri?","Mana yang lebih penting: gaji atau minat?","Kebingungan terbesar dalam kariermu saat ini?","Di mana kamu melihat dirimu sepuluh tahun lagi?"],
+  "Ide Sampingan": ["Apakah punya pekerjaan sampingan?","Sampingan apa yang pernah kamu pikirkan?","Apakah pekerjaan sampingan bisa mengganggu pekerjaan utama?","Apakah kamu melakukan sampingan karena uang atau minat?","Mungkinkah sampingan menjadi pekerjaan utama?"],
+  "Hasrat Wirausaha": ["Pernah berpikir untuk membuka usaha sendiri?","Apa risiko terbesar berwirausaha?","Apakah kamu kenal seseorang yang sukses berwirausaha?","Jika diberi modal, toko apa yang akan kamu buka?","Mana yang lebih melelahkan: bekerja pada orang lain atau untuk diri sendiri?"],
+  "Penghasilan Pertama": ["Kapan pertama kali kamu mendapat uang?","Bagaimana kamu mendapat penghasilan pertama?","Apa yang kamu beli dari penghasilan pertamamu?","Haruskah anak muda fokus mencari uang atau belajar?","Pernahkah berpikir bagaimana mendapat lebih banyak uang?"],
+  "Peningkatan Gaya Hidup": ["Apa barang terakhir yang kamu beli dan meningkatkan kebahagiaan?","Jenis barang apa yang layak dibeli mahal?","Pernah membeli barang mahal dan merasa benar-benar sepadan?","Apakah penghematan gaya hidup realistis?","Apakah kamu rela membayar lebih untuk pelayanan yang baik?"],
+  "Memilah Barang": ["Pernah masa-masa memilah dan membuang barang?","Apakah terlalu banyak barang di rumah mempengaruhi suasana hati?","Ada barang yang tidak bisa kamu buang tapi tidak pernah dipakai?","Membuang barang membuatmu lega atau bersalah?","Apakah gaya hidup minimalis membawa kebahagiaan?"],
+  "Bencana Dapur": ["Pernah gagal masak parah?","Kecelakaan dapur paling parahmu?","Umur berapa pertama kali kamu masak?","Apakah kamu punya bakat memasak?","Kamu masak dengan feeling atau mengikuti resep?"],
+  "Pencinta Manis": ["Apakah kamu suka makanan manis?","Apakah makan manis membantu saat sedang sedih?","Ada makanan manis yang tidak pernah membosankan?","Pernah mencoba membuat kue atau kue kering sendiri?","Apakah bubble tea minuman kebahagiaan atau bom kalori?"],
+  "Kebiasaan Kopi": ["Apakah kamu minum kopi setiap hari?","Bisakah kamu bangun tanpa kopi?","Kamu lebih suka Americano atau latte?","Maukah kamu pergi ke kafe tertentu demi kopi yang enak?","Pernah minum terlalu banyak kopi sampai tidak bisa tidur?"],
+  "Budaya Minum": ["Bisakah kamu minum alkohol?","Apakah menolak ajakan minum itu boleh?","Pernah mabuk? Bagaimana rasanya?","Apakah orang yang tidak minum merasa tersisih di pesta?","Pernah pura-pura sakit untuk menghindari minum?"],
+  "Camilan Masa Kecil": ["Camilan favoritmu semasa kecil?","Masih bisakah kamu menemukan camilan masa kecil itu?","Pernah membeli mi instan demi mengoleksi kartu?","Apakah camilan dulu lebih enak atau sekarang?","Apakah kamu masih makan camilan pedas?"],
+  "Makanan Pesan- Antar Mengecewakan": ["Pernah pesan makanan online yang sangat buruk?","Apakah kamu membaca ulasan negatif sebelum pesan?","Pernah kecewa karena foto tidak sesuai realita?","Masalah apa yang paling tidak bisa kamu terima dari pesan-antar?","Apakah kamu akan nilai bagus karena kemasannya bagus?"],
+  "Antrean Restoran": ["Berapa lama kamu rela antre demi makanan enak?","Pernah antre lama tapi merasa tidak sepadan?","Apakah kamu membatalkan niat karena tidak mau antre?","Apakah restoran yang viral patut dicoba?","Pernah pergi jauh hanya untuk makan di suatu tempat?"],
+  "Kecemasan Kesehatan": ["Apakah kamu merasa kesehatanmu baik-baik saja?","Pernah begadang menyebabkan masalah kesehatan?","Kapan terakhir kali kamu cek kesehatan?","Apakah membaca konten kesehatan membuatmu cemas?","Apakah boleh 'merusak' tubuh saat masih muda?"],
+  "Kualitas Tidur": ["Bagaimana kualitas tidurmu akhir-akhir ini?","Apakah kamu bermimpi? Ingat mimpimu?","Pernah insomnia? Apa yang kamu pikirkan?","Apakah bermain HP sebelum tidur mempengaruhi tidur?","Ada tips agar tidur lebih nyenyak?"],
+  "Sakit": ["Kapan terakhir kali kamu sakit?","Saat sakit, kamu bertahan sendiri atau pergi ke dokter?","Apa yang paling kamu butuhkan ketika sakit?","Pernah mengabaikan penyakit kecil sampai menjadi parah?","Apakah kamu takut suntik?"],
+  "Gen dan Penampilan": ["Kamu mirip siapa di keluargamu?","Apakah orang tuamu pernah bilang kamu mirip mereka?","Pernah iri dengan penampilan orang lain?","Mana yang lebih penting: penampilan atau karakter?","Pernah berpikir untuk operasi plastik?"],
+  "Tinggi dan Berat Badan": ["Apakah kamu puas dengan tinggi badanmu?","Pernah cemas dengan berat badan?","Hal paling ekstrem yang kamu lakukan untuk menurunkan berat badan?","Apakah kurus membuatmu terlihat lebih menarik?","Apakah tinggi badan pasangan penting bagimu?"],
+  "Kebebasan Berpakaian": ["Apakah kebebasan berpakaian penting?","Pernah tidak jadi memakai batu tertentu karena pandangan orang lain?","Apakah kamu memperhatikan pakaian saat di kantor?","Beranikah kamu memakai pakaian mencolok?","Apakah pakaian harus disesuaikan dengan acara?"],
+  "Makeup Saat Keluar": ["Apakah kamu memakai makeup saat keluar?","Apakah kamu merasa tertekan saat tidak bermakeup?","Paling cepat berapa lama kamu berdandan?","Pernah terlambat karena makeup?","Apakah makeup untuk diri sendiri atau untuk orang lain?"],
+  "Perawatan Pria": ["Apakah pria harus merawat kulit?","Banyak pria di sekitarmu yang memakai produk perawatan kulit?","Bisakah kamu menerima pria bermakeup?","Apakah pria pakai skincare itu aneh?","Apakah kamu akan membelikan skincare untuk pacarmu?"],
+  "Konflik Pasangan": ["Berapa lama pertengkaran terlamamu dengan pasangan?","Apakah kamu cenderung meminta maaf lebih dulu?","Apakah sikap diam menyelesaikan masalah?","Pernah bertengkar hebat karena hal sepele?","Apakah bertengkar kadang baik untuk hubungan?"],
+  "Pengalaman Buta": ["Pernah ta'aruf / buta?","Seperti apa pengalaman buta paling aneh yang pernah kamu alami?","Bisakah cinta sejati datang dari ta'aruf?","Apakah kamu akan menjalani ta'aruf karena desakan keluarga?","Apa yang biasanya dibicarakan saat pertama kali bertemu?"],
+  "Hubungan Jarak Jauh": ["Bisakah kamu menjalani LDR?","Apa tantangan terbesar LDR?","Apakah kamu tahu seseorang yang berhasil menjalani LDR?","Bisakah HP mempertahankan hubungan?","Apakah LDR sepadan?"],
+  "Pandangan tentang Pernikahan": ["Apakah kamu ingin menikah?","Menurutmu usia berapa yang tepat untuk menikah?","Apakah harus punya rumah dulu sebelum menikah?","Apakah orang tuamu pernah mendesakmu menikah?","Bagaimana jadinya jika tidak pernah menikah?"],
+  "Imajinasi Pernikahan": ["Pernikahan seperti apa yang kamu impikan?","Apakah pesta pernikahan itu wajib?","Apakah kamu memilih menikah sambil traveling?","Pernikahan paling berkesan yang pernah kamu hadiri?","Apakah uang amplop harus dikembalikan?"],
+  "Keinginan Punya Anak": ["Apakah kamu ingin memiliki anak?","Berapa anak yang ideal?","Apakah mengasuh anak membuatmu takut?","Apakah kamu ingin anak karena cinta atau karena tradisi?","Pernah berpikir untuk tidak punya anak?"],
+  "Pola Asuh": ["Apakah memukul anak diperbolehkan?","Kamu setuju dengan pola asuh bahagia atau disiplin ketat?","Haruskah anak mengikuti les?","Apakah kamu akan membiarkan anak memegang HP?","Haruskah orang tua mengambil keputusan untuk anak?"],
+  "Tinggal dengan Orang Tua": ["Apakah kamu bertengkar dengan orang tua?","Seberapa sering kamu pulang kampung?","Apakah orang tuamu memahamimu?","Ada sesuatu yang ingin kamu katakan tapi tidak bisa?","Haruskah kamu hidup sesuai harapan orang tua?"],
+  "Saudara Kandung": ["Apakah kamu punya saudara kandung?","Lebih baik punya saudara atau anak tunggal?","Apakah hubunganmu dengan saudara dekat?","Apakah kamu akan membantu saudaramu jika perlu?","Pernah merasa orang tua pilih kasih?"],
+  "Kenangan Kakek Nenek": ["Apakah kamu tinggal dengan kakek nenek saat kecil?","Apa hal penting yang diajarkan kakek/nenek padamu?","Pernah menyesal tidak lebih banyak menghabiskan waktu dengan mereka?","Apakah hubungan kakek-cucu itu istimewa?","Apakah kamu menelepon kakek/nenekmu?"],
+  "Kenangan Pindahan": ["Berapa kali kamu pindah rumah?","Masih ingat tempat tinggalmu semasa kecil?","Apa yang paling kamu rindukan setelah pindah?","Pernah kehilangan barang penting karena pindahan?","Apakah kamu memiliki rasa 'rumah'?"],
+  "Kerinduan Kampung Halaman": ["Di mana kampung halamanmu?","Seberapa sering kamu pulang?","Apakah kampung halamanmu banyak berubah?","Pernah berpikir untuk kembali ke kampung halaman?","Apakah kampung halaman adalah tempat yang sulit kembali?"],
+  "Memilih Kota": ["Mengapa kamu tinggal di kota ini?","Kota mana yang ingin kamu tinggali?","Mana yang lebih baik: kota besar atau kota kecil?","Pernah pindah kota karena seseorang?","Apakah kamu terbiasa dengan ritme kota saat ini?"],
+  "Kontrak & Pindahan": ["Apa yang paling kamu takuti saat pindahan?","Prioritas utama saat mencari tempat tinggal?","Pernah diusir karena masalah dengan pemilik rumah?","Apakah kamu akur dengan teman sekost?","Apakah tinggal sendiri aman?"],
+  "Hubungan dengan Tetangga": ["Apakah kamu kenal tetanggamu?","Pernah punya tetangga aneh?","Apakah kamu akan komplain jika tetangga berisik?","Apakah hubungan baik dengan tetangga itu penting?","Apakah kamu menyapa tetangga terlebih dahulu?"],
+  "Transportasi Umum": ["Apakah kamu lebih sering naik MRT atau bus?","Pernah kelewatan halte karena main HP?","Perilaku penumpang mana yang paling mengganggumu?","Pernah memberikan kursi untuk orang lain?","Haruskah transportasi umum lebih bersopan santun?"],
+  "Pengalaman Berkendara": ["Apakah kamu punya SIM?","Apakah sering mengemudi?","Pernah mengalami emosi di jalan?","Mana yang lebih melelahkan: mengemudi atau menjadi penumpang?","Jalan seperti apa yang paling kamu nikmati?"],
+  "Mendapat SIM": ["Berapa kali ujian SIM sampai lulus?","Bagian mana yang paling sulit?","Apakah instrukturmu pernah memarikimu?","Berapa lama waktu yang kamu butuhkan untuk mendapatkan SIM?","Haruskah ujian SIM diperketat?"],
+  "Berjalan Kaki": ["Apakah kamu suka berjalan kaki?","Apakah kamu berjalan-jalan setelah makan?","Pernah berjalan tanpa tujuan untuk waktu lama?","Apakah berjalan kaki membantu menjernihkan pikiran?","Apa yang kamu pikirkan saat berjalan sendirian?"],
+  "Suasana Hujan": ["Apakah kamu suka hujan?","Apakah hujan membuatmu malas keluar?","Hal apa yang paling enak dilakukan saat hujan?","Pernah berlari di tengah hujan?","Apakah hujan membuatmu merasa tenang?"],
+  "Aktivitas Cerah": ["Aktivitas favoritmu saat cuaca cerah?","Apakah kamu keluar karena cuaca bagus?","Pernah melakukan perjalanan spontan karena cuaca cerah?","Apakah cuaca cerah memperbaiki mood?","Matahari terik atau langit mendung?"],
+  "Musim Gugur dan Dingin": ["Kamu lebih suka musim gugur atau dingin?","Hal tersulit saat musim dingin?","Pernah susah bangun karena terlalu dingin?","Apakah suka memakai pakaian tebal?","Makanan favoritmu saat musim dingin?"],
+  "Musim Semi dan Panas": ["Kamu lebih suka musim semi atau panas?","Apakah panas mengganggumu?","Hal yang paling kamu sukai dari musim panas?","Apakah musim semi membuatmu mengantuk?","Apakah kamu alergi saat pergantian musim?"],
+  "Resolusi Tahun Baru": ["Apakah kamu membuat resolusi tahun baru setiap tahun?","Apakah resolusi tahun lalu tercapai?","Apakah resolusi tahun baru berguna?","Satu hal yang sangat ingin kamu lakukan tahun ini?","Pernah menjalankan resolusi dalam waktu lama?"],
+  "Kafe": ["Apakah kamu suka pergi ke kafe?","Memilih kopi berdasarkan nama atau rasa?","Ada kafe dengan suasana yang kamu sukai?","Apakah kafe lebih cocok untuk kerja atau ngobrol?","Apakah pergi ke kafe sendirian itu aneh?"],
+  "Belanja Online & Paket": ["Rata-rata berapa paket yang kamu terima per bulan?","Apakah membuka paket bisa memperbaiki mood?","Apakah kamu membeli barang tidak perlu demi gratis ongkir?","Mengapa beberapa orang tidak segera membuka paket?","Mana yang lebih membuat ketagihan: belanja online atau toko fisik?"]
+};
+
+// ======================= 5. 语言配置 =======================
+const LANG_CONFIG = {
+  zh: { name: "中文", pool: ZH_POOL, homeBtn: "🏠 返回首页", libraryTitle: "📖 全部话题库", refreshText: "↺ 刷新全部", doneLabel: "✓ 已完成", markLabel: "○ 标记完成", replaceLabel: "🔄 换问题", changeCatLabel: "🏷️ 换分类", backBtn: "← 返回提问", appTitle: "✨ 闲聊提问器", libBtn: "📚 话题库" },
+  en: { name: "English", pool: EN_POOL, homeBtn: "🏠 Back to Home", libraryTitle: "📖 All Topics", refreshText: "↺ Refresh All", doneLabel: "✓ Done", markLabel: "○ Mark done", replaceLabel: "🔄 Replace", changeCatLabel: "🏷️ Change category", backBtn: "← Back to Chat", appTitle: "✨ Chat Spark", libBtn: "📚 Topic Bank" },
+  tr: { name: "Türkçe", pool: TR_POOL, homeBtn: "🏠 Ana Sayfaya Dön", libraryTitle: "📖 Tüm Konular", refreshText: "↺ Hepsini Yenile", doneLabel: "✓ Yapıldı", markLabel: "○ Yapıldı işaretle", replaceLabel: "🔄 Değiştir", changeCatLabel: "🏷️ Kategori değiştir", backBtn: "← Sohbete Dön", appTitle: "✨ Sohbet Kıvılcımı", libBtn: "📚 Konu Bankası" },
+  id: { name: "Bahasa Indonesia", pool: ID_POOL, homeBtn: "🏠 Kembali ke Beranda", libraryTitle: "📖 Semua Topik", refreshText: "↺ Segarkan Semua", doneLabel: "✓ Selesai", markLabel: "○ Tandai selesai", replaceLabel: "🔄 Ganti", changeCatLabel: "🏷️ Ganti kategori", backBtn: "← Kembali ke Obrolan", appTitle: "✨ Percikan Obrolan", libBtn: "📚 Bank Topik" }
+};
+
+// ======================= 6. 动态生成语言界面 =======================
+const wrapper = document.getElementById('app-wrapper');
+const langHome = document.getElementById('lang-home');
+const langBtns = document.querySelectorAll('.lang-btn');
+
+const appInstances = {};
+const languages = ['zh', 'en', 'tr', 'id'];
+
+languages.forEach(lang => {
+    const appDiv = document.createElement('div');
+    appDiv.id = `app-${lang}`;
+    appDiv.className = 'lang-app lang-app-hidden';
+    
+    appDiv.innerHTML = `
+        <div id="game-page-${lang}" class="page-visible">
+            <div class="game-header">
+    <h1>${LANG_CONFIG[lang].appTitle}</h1>
+    <div style="display: flex; gap: 8px;">
+        <button id="home-from-game-${lang}" class="btn-icon">🏠</button>
+        <button id="open-library-${lang}" class="btn-icon">📚</button>
+        <button id="refresh-game-${lang}" class="btn-icon">↺</button>
+    </div>
+</div>
+            <div class="container" id="display-area-${lang}"></div>
+        </div>
+        <div id="library-page-${lang}" class="page-hidden">
+            <div class="library-header">
+               <button id="home-from-lib-${lang}" class="btn-icon" style="background:#E9F0F5;">🏠</button>
+                <button id="back-to-game-${lang}" class="btn-icon" style="background:#E9F0F5;">←</button>
+                <h2>${LANG_CONFIG[lang].libraryTitle} <span id="topic-count-${lang}" class="topic-count-badge">0</span></h2>
+            </div>
+            <div id="topic-list-${lang}" class="topic-accordion"></div>
+        </div>
+    `;
+    wrapper.appendChild(appDiv);
+    
+    appInstances[lang] = {
+        element: appDiv,
+        pool: LANG_CONFIG[lang].pool,
+        langCode: lang,
+        config: LANG_CONFIG[lang]
+    };
+});
+
+// ======================= 7. 初始化每个语言的应用逻辑 =======================
+function initLanguageApp(lang) {
+    const instance = appInstances[lang];
+    if (!instance) return;
+    const pool = instance.pool;
+    let currentQuestions = [];
+    let isAnimating = false;
+    
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/[&<>]/g, function(m) {
+            if (m === '&') return '&amp;';
+            if (m === '<') return '&lt;';
+            if (m === '>') return '&gt;';
+            return m;
+        });
+    }
+    
+    function getRandomCategories(count) {
+        let cats = Object.keys(pool);
+        for (let i = cats.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [cats[i], cats[j]] = [cats[j], cats[i]];
+        }
+        return cats.slice(0, count);
+    }
+    
+    function generateAll() {
+        const selectedCats = getRandomCategories(3);
+        currentQuestions = selectedCats.map(cat => {
+            const list = pool[cat];
+            return {
+                cat: cat,
+                text: list[Math.floor(Math.random() * list.length)],
+                done: false
+            };
+        });
+        renderGame();
+    }
+    
+    function renderGame() {
+        const area = document.getElementById(`display-area-${lang}`);
+        if (!area) return;
+        area.innerHTML = '';
+        const labels = {
+            done: instance.config.doneLabel,
+            mark: instance.config.markLabel,
+            replace: instance.config.replaceLabel,
+            changeCat: instance.config.changeCatLabel
+        };
+        currentQuestions.forEach((q, idx) => {
+            const cardDiv = document.createElement('div');
+            cardDiv.className = `question-card ${q.done ? 'completed' : ''}`;
+            cardDiv.id = `card-${lang}-${idx}`;
+            cardDiv.innerHTML = `
+                <span class="cat-label">📌 ${escapeHtml(q.cat)}</span>
+                <div class="q-content">${escapeHtml(q.text)}</div>
+                <div class="card-controls">
+                    <button class="btn-mini btn-check ${q.done ? 'active' : ''}" data-action="done" data-index="${idx}">${q.done ? labels.done : labels.mark}</button>
+                    <button class="btn-mini btn-q" data-action="replace" data-index="${idx}">${labels.replace}</button>
+                    <button class="btn-mini btn-cat" data-action="changeCat" data-index="${idx}">${labels.changeCat}</button>
+                </div>
+            `;
+            area.appendChild(cardDiv);
+        });
+        document.querySelectorAll(`#app-${lang} .btn-check, #app-${lang} .btn-q, #app-${lang} .btn-cat`).forEach(btn => {
+            btn.removeEventListener('click', handleCardClick);
+            btn.addEventListener('click', handleCardClick);
+        });
+    }
+    
+    function handleCardClick(e) {
+        if (isAnimating) return;
+        const btn = e.currentTarget;
+        const action = btn.getAttribute('data-action');
+        const idx = parseInt(btn.getAttribute('data-index'));
+        if (action === 'done') toggleDone(idx);
+        else if (action === 'replace') replaceQuestion(idx);
+        else if (action === 'changeCat') changeCategory(idx);
+    }
+    
+    function toggleDone(i) {
+        currentQuestions[i].done = !currentQuestions[i].done;
+        renderGame();
+    }
+    
+    function replaceQuestion(i) {
+        if (isAnimating) return;
+        isAnimating = true;
+        const card = document.getElementById(`card-${lang}-${i}`);
+        if (card) card.classList.add('drawer-out');
+        setTimeout(() => {
+            const cat = currentQuestions[i].cat;
+            const list = pool[cat];
+            let newText = list[Math.floor(Math.random() * list.length)];
+            if (newText === currentQuestions[i].text && list.length > 1) {
+                newText = list[Math.floor(Math.random() * list.length)];
+            }
+            currentQuestions[i].text = newText;
+            currentQuestions[i].done = false;
+            renderGame();
+            setTimeout(() => { isAnimating = false; }, 50);
+        }, 350);
+    }
+    
+    function changeCategory(i) {
+        if (isAnimating) return;
+        isAnimating = true;
+        const card = document.getElementById(`card-${lang}-${i}`);
+        if (card) card.classList.add('slide-left-out');
+        setTimeout(() => {
+            const currentCats = currentQuestions.map(q => q.cat);
+            const availableCats = Object.keys(pool).filter(c => !currentCats.includes(c));
+            let newCat = availableCats.length > 0 ? availableCats[Math.floor(Math.random() * availableCats.length)] : currentQuestions[i].cat;
+            if (newCat === currentQuestions[i].cat && Object.keys(pool).length > 1) {
+                const others = Object.keys(pool).filter(c => c !== newCat);
+                if (others.length) newCat = others[Math.floor(Math.random() * others.length)];
+            }
+            currentQuestions[i].cat = newCat;
+            currentQuestions[i].text = pool[newCat][Math.floor(Math.random() * pool[newCat].length)];
+            currentQuestions[i].done = false;
+            renderGame();
+            setTimeout(() => { isAnimating = false; }, 380);
+        }, 380);
+    }
+    
+    function shatterRefresh() {
+        if (isAnimating) return;
+        isAnimating = true;
+        const cards = document.querySelectorAll(`#app-${lang} .question-card`);
+        if (cards.length === 0) {
+            generateAll();
+            isAnimating = false;
+            return;
+        }
+        cards.forEach(card => {
+            card.style.setProperty('--tx', (Math.random() - 0.5) * 500 + 'px');
+            card.style.setProperty('--ty', (Math.random() - 0.5) * 500 + 'px');
+            card.style.setProperty('--tr', (Math.random() - 0.5) * 120 + 'deg');
+            card.classList.add('shatter-out');
+        });
+        setTimeout(() => {
+            generateAll();
+            isAnimating = false;
+        }, 500);
+    }
+    
+    function renderLibrary() {
+        const container = document.getElementById(`topic-list-${lang}`);
+        if (!container) return;
+        const topics = Object.keys(pool);
+        const countDisplay = document.getElementById(`topic-count-${lang}`);
+        if (countDisplay) countDisplay.textContent = topics.length;
+        let html = '';
+        topics.forEach(topic => {
+            const questions = pool[topic];
+            const qItems = questions.map((q, idx) => `<div class="question-item">${idx+1}. ${escapeHtml(q)}</div>`).join('');
+            html += `
+                <div class="topic-item">
+                    <div class="topic-title">
+                        <span>📂 ${escapeHtml(topic)} (${questions.length})</span>
+                        <span class="topic-arrow">▶</span>
+                    </div>
+                    <div class="question-list">${qItems}</div>
+                </div>
+            `;
+        });
+        container.innerHTML = html;
+        container.querySelectorAll('.topic-item').forEach(item => {
+            const titleDiv = item.querySelector('.topic-title');
+            const questionDiv = item.querySelector('.question-list');
+            const arrowSpan = item.querySelector('.topic-arrow');
+            titleDiv.addEventListener('click', () => {
+                const isOpen = questionDiv.classList.contains('show');
+                if (isOpen) {
+                    questionDiv.classList.remove('show');
+                    arrowSpan.classList.remove('open');
+                } else {
+                    questionDiv.classList.add('show');
+                    arrowSpan.classList.add('open');
+                }
+            });
+        });
+    }
+    
+    function showGamePage() {
+        const gameDiv = document.getElementById(`game-page-${lang}`);
+        const libDiv = document.getElementById(`library-page-${lang}`);
+        if (gameDiv && libDiv) {
+            gameDiv.classList.add('page-visible');
+            gameDiv.classList.remove('page-hidden');
+            libDiv.classList.add('page-hidden');
+            libDiv.classList.remove('page-visible');
+        }
+    }
+    
+    function showLibraryPage() {
+        const gameDiv = document.getElementById(`game-page-${lang}`);
+        const libDiv = document.getElementById(`library-page-${lang}`);
+        if (gameDiv && libDiv) {
+            libDiv.classList.add('page-visible');
+            libDiv.classList.remove('page-hidden');
+            gameDiv.classList.add('page-hidden');
+            gameDiv.classList.remove('page-visible');
+        }
+        renderLibrary();
+    }
+    
+    // 绑定按钮事件（包括新增的返回首页按钮）
+    document.getElementById(`open-library-${lang}`)?.addEventListener('click', showLibraryPage);
+    document.getElementById(`back-to-game-${lang}`)?.addEventListener('click', showGamePage);
+    document.getElementById(`refresh-game-${lang}`)?.addEventListener('click', shatterRefresh);
+    document.getElementById(`home-from-game-${lang}`)?.addEventListener('click', backToHome);
+    document.getElementById(`home-from-lib-${lang}`)?.addEventListener('click', backToHome);
+    
+    generateAll();
+    renderLibrary();
+}
+
+// ======================= 8. 返回首页的全局函数 =======================
+function backToHome() {
+    // 隐藏所有语言的应用容器（可选，避免残留）
+    languages.forEach(lang => {
+        const appEl = document.getElementById(`app-${lang}`);
+        if (appEl) appEl.classList.add('lang-app-hidden');
+    });
+    // 显示语言选择首页，隐藏主包装器
+    document.getElementById('lang-home').style.display = 'flex';
+    document.getElementById('app-wrapper').style.display = 'none';
+}
+
+// 初始化所有语言
+languages.forEach(lang => initLanguageApp(lang));
+
+// ======================= 9. 语言切换逻辑（修复版） =======================
+langBtns.forEach(btn => {
+    btn.addEventListener('click', function(e) {
+        const selectedLang = this.getAttribute('data-lang');
+        
+        // 隐藏所有语言界面
+        languages.forEach(lang => {
+            const appEl = document.getElementById(`app-${lang}`);
+            if (appEl) appEl.classList.add('lang-app-hidden');
+        });
+        
+        // 显示选中的语言界面
+        const selectedApp = document.getElementById(`app-${selectedLang}`);
+        if (selectedApp) {
+            selectedApp.classList.remove('lang-app-hidden');
+            // 确保游戏页可见，话题库页隐藏
+            const gamePage = document.getElementById(`game-page-${selectedLang}`);
+            const libPage = document.getElementById(`library-page-${selectedLang}`);
+            if (gamePage && libPage) {
+                gamePage.classList.add('page-visible');
+                gamePage.classList.remove('page-hidden');
+                libPage.classList.add('page-hidden');
+                libPage.classList.remove('page-visible');
+            }
+        }
+        
+        // 隐藏语言选择首页，显示主包装器
+        langHome.style.display = 'none';
+        wrapper.style.display = 'block';
+    });
+});
+
+// 初始状态：显示首页，wrapper 不隐藏但内部所有语言应用初始就是隐藏的，所以没关系
+wrapper.style.display = 'block';
+</script>
+</body>
+</html>
